@@ -146,6 +146,8 @@ def _masked(s: Settings) -> dict:
     for key in ("ntfy_token", "discord_webhook"):
         if d["notify"][key]:
             d["notify"][key] = MASK
+    if d["github_token"]:
+        d["github_token"] = MASK
     return d
 
 
@@ -162,6 +164,8 @@ def _unmask(new: dict, old: Settings) -> dict:
         new["ui_password"] = old.ui_password
     elif new.get("ui_password"):
         new["ui_password"] = auth.hash_password(new["ui_password"])  # a new password was typed
+    if new.get("github_token") == MASK:
+        new["github_token"] = old.github_token
     old_passwords = {r.registry: r.password for r in old.registries}
     for reg in new.get("registries") or []:
         if reg.get("password") == MASK:

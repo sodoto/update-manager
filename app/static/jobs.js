@@ -5,7 +5,7 @@ const Jobs = (() => {
   let timer;
 
   function canApply(i, action = i.kind === "docker" ? "compose-update" : "upgrade") {
-    if (action === "upgrade") return i.kind === "lxc" && i.vmid != null && MANAGERS.includes(i.manager);
+    if (action === "upgrade") return i.kind === "lxc" && i.vmid != null && MANAGERS.includes(i.manager) && i.update_count > 0;
     if (action === "reboot") return i.kind === "lxc" && i.vmid != null;
     if (action === "compose-update") return i.kind === "docker" && i.vmid != null && !!i.compose_dir && !!i.container_id;
     return false;

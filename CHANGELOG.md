@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.9.0 (2026-10-15)
+- Community scripts: LXCs created with the Proxmox VE community scripts are detected ("Helper script" badge),
+  and their app version is compared with the latest GitHub release, like the script's own `update` does
+  (including versions pinned by the script maintainers). "App update" badge, details table, notifications,
+  and instructions to run `update` in the container's console.
+- Optional GitHub token in Settings (GitHub allows 60 version lookups per hour without one; results are cached 6 hours).
+- Read-only gateway v3: paste the read-only setup block from Settings on each node again to enable this.
+
 ## 1.8.0 (2026-10-15)
 - The confirmation before an update shows exactly what will run: the action Update Manager asks Proxmox
   for, and the commands Proxmox runs inside the container.

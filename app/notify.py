@@ -11,7 +11,9 @@ log = logging.getLogger("update-manager")
 def _describe(item: dict) -> str:
     if item["kind"] == "docker":
         return f"{item['name']} ({item['source']}) - new image for {item['detail']}"
-    return f"{item['name']} ({item['source']}) - {item['update_count']} package(s)"
+    parts = [f"{item['update_count']} package(s)"] if item["update_count"] else []
+    parts += [f"{a['name']} {a['current']} -> {a['latest']}" for a in item.get("app_updates", []) if a["update"]]
+    return f"{item['name']} ({item['source']}) - {', '.join(parts)}"
 
 
 async def send_notifications(cfg: Notify, new_items: list[dict]) -> None:

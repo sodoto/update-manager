@@ -6,6 +6,7 @@ import logging
 from urllib.parse import urlsplit
 from datetime import datetime, timezone
 
+from .community import CommunityScripts
 from .config import DATA_DIR, DockerHost, ProxmoxNode, Settings
 from .docker_sources import ContainerInfo, DockerAPISource, DockerCLISource, dockhand_port
 from .notify import send_notifications
@@ -40,6 +41,7 @@ def _signature(item: dict) -> str:
     if item["kind"] == "docker":
         return item.get("remote_digest") or ""
     pkgs = sorted(f"{p['name']}={p['new']}" for p in item["packages"])
+    pkgs += sorted(f"app:{a['name']}={a['latest']}" for a in item.get("app_updates", []) if a["update"])
     return hashlib.sha1("\n".join(pkgs).encode()).hexdigest()
 
 
@@ -81,6 +83,7 @@ class Checker:
     def __init__(self, settings: Settings):
         self.settings = settings
         self._lock = asyncio.Lock()
+        self.community = CommunityScripts()
         self._busy: set[str] = set()  # items being re-checked on their own
         self.state = {
             "running": False, "last_check_started": None, "last_check_finished": None,
@@ -172,8 +175,8 @@ class Checker:
             version = await session.require_gateway()
             if version < GATEWAY_VERSION:
                 self._warnings.append({"source": node.name, "message":
-                    f"read-only gateway v{version} is outdated (v{GATEWAY_VERSION} available): paste the setup "
-                    "block from Settings on this node again to enable automatic Dockhand links."})
+                    f"read-only gateway v{version} is outdated (v{GATEWAY_VERSION} available): paste the read-only "
+                    "setup block from Settings on this node again (needed for community-script app updates)."})
             if node.check_host:
                 async with sem:
                     items.append(await self._check_host(session, node))
@@ -208,7 +211,10 @@ class Checker:
             except Exception as exc:
                 item.update(status="error", note=_err(exc))
                 return [item] if node.check_lxc else []
-        item, has_docker = self._apply_report_full(item, code, out, err)
+        item, report = self._apply_report_full(item, code, out, err)
+        has_docker = bool(report and report.has_docker)
+        if report and report.community_script:
+            await self._check_app(item, report)
         ip = await session.lxc_ip(vmid)
         item["ip"] = ip  # shown in the "how to update" instructions (ssh root@ip)
         items = [item] if node.check_lxc else []
@@ -308,15 +314,28 @@ class Checker:
             fresh.update(ip=item.get("ip"), lxc_name=item.get("lxc_name"))
             return [fresh], {item["id"]}
 
+    async def _check_app(self, item: dict, report: PackageReport) -> None:
+        """Community-script LXC: compare the app version it recorded with the latest release."""
+        item["community_script"] = report.community_script
+        try:
+            apps, note = await self.community.check(report.community_script, report.app_versions,
+                                                    self.settings.github_token)
+        except Exception as exc:
+            apps, note = [], f"app version check failed: {_err(exc)}"
+        item["app_updates"] = apps
+        item["app_note"] = note
+        if any(a["update"] for a in apps) and item["status"] == "up_to_date":
+            item["status"] = "update_available"
+
     def _apply_report(self, item: dict, code: int, out: str, err: str) -> dict:
         return self._apply_report_full(item, code, out, err)[0]
 
     @staticmethod
-    def _apply_report_full(item: dict, code: int, out: str, err: str) -> tuple[dict, bool]:
-        """Fills a package item from the check script output; also returns whether Docker is installed."""
+    def _apply_report_full(item: dict, code: int, out: str, err: str) -> tuple[dict, PackageReport | None]:
+        """Fills a package item from the check script output; also returns the parsed report."""
         if "@@PM" not in out:
             item.update(status="error", note=(err or out).strip()[-300:] or f"check failed (exit {code})")
-            return item, False
+            return item, None
         report: PackageReport = parse_check_output(out)
         prefix = f"{item['detail']} · " if item["kind"] == "lxc" else ""
         item.update(
@@ -335,4 +354,4 @@ class Checker:
             item["status"] = "update_available"
         else:
             item["status"] = "up_to_date"
-        return item, report.has_docker
+        return item, report

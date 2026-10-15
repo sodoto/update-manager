@@ -69,6 +69,7 @@ class Settings(_Model):
     docker_hosts: list[DockerHost] = Field(default_factory=list)
     proxmox: list[ProxmoxNode] = Field(default_factory=list)
     registries: list[RegistryAuth] = Field(default_factory=list)
+    github_token: str | None = None  # optional, raises GitHub's limit for community-script version checks
     notify: Notify = Field(default_factory=Notify)
 
     @model_validator(mode="after")

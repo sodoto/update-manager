@@ -96,10 +96,13 @@ const Dashboard = (() => {
 
   function row(i) {
     const badges = [`<span class="badge kind">${KIND[i.kind]}</span>`];
-    if (i.status === "update_available") {
+    const apps = (i.app_updates || []).filter(a => a.update);
+    if (i.community_script) badges.push(`<span class="badge" title="Created with the Proxmox VE community script ct/${esc(i.community_script)}.sh">Helper script</span>`);
+    if (apps.length) badges.push(`<span class="badge update_available" title="${esc(apps.map(a => `${a.name} ${a.current} → ${a.latest}`).join(", "))}">App update</span>`);
+    if (i.status === "update_available" && (i.kind === "docker" || i.update_count)) {
       badges.push(`<span class="badge update_available">${i.kind === "docker" ? "New image" : `${i.update_count} package${i.update_count === 1 ? "" : "s"}`}</span>`);
       if (i.security_count) badges.push(`<span class="badge sec">${i.security_count} security</span>`);
-    } else {
+    } else if (i.status !== "update_available") {
       badges.push(`<span class="badge ${i.status}">${STATUS[i.status]}</span>`);
     }
     if (i.reboot_required) badges.push(`<span class="badge update_available">Reboot required</span>`);
@@ -116,7 +119,7 @@ const Dashboard = (() => {
       buttons.push(`<button class="primary" data-apply="${esc(i.id)}">Update</button>`);
     if (i.status === "update_available")
       buttons.push(`<button class="icon-btn" data-howto="${esc(i.id)}" title="How to update" aria-label="How to update ${esc(i.name)}">i</button>`);
-    if (i.packages.length || i.kind === "docker" || i.note)
+    if (i.packages.length || i.kind === "docker" || i.note || i.community_script)
       buttons.push(`<button data-toggle="${esc(i.id)}">${open.has(i.id) ? "Hide" : "Details"}</button>`);
     if (i.link) buttons.push(`<a class="btn" href="${esc(i.link)}" target="_blank" rel="noopener">Dockhand ↗</a>`);
 
@@ -142,6 +145,17 @@ const Dashboard = (() => {
         + (i.status === "update_available" ? `<p>Pull the new image and recreate the container (e.g. from Dockhand) to apply.</p>` : "");
     }
     let html = i.note ? `<p>${esc(i.note)}</p>` : "";
+    if (i.community_script) {
+      html += `<p><b>App</b> (community script <a href="https://github.com/community-scripts/ProxmoxVE/blob/main/ct/${esc(i.community_script)}.sh" target="_blank" rel="noopener">ct/${esc(i.community_script)}.sh</a>)</p>`;
+      html += (i.app_updates || []).length
+        ? `<table><tr><th>Component</th><th>Installed</th><th>Latest</th><th></th></tr>${i.app_updates.map(a =>
+            `<tr><td><a href="https://github.com/${esc(a.repo)}/releases" target="_blank" rel="noopener">${esc(a.name)}</a></td>
+             <td>${esc(a.current)}</td><td>${esc(a.latest)}${a.pinned ? ' <span class="hint" title="Version tested by the script maintainers">(tested)</span>' : ""}</td>
+             <td>${a.update ? '<span class="badge update_available">update</span>' : '<span class="badge up_to_date">up to date</span>'}</td></tr>`).join("")}</table>`
+        : `<p class="hint">${esc(i.app_note || "No app version recorded in this container.")}</p>`;
+      if ((i.app_updates || []).length && i.app_note) html += `<p class="hint">${esc(i.app_note)}</p>`;
+      if (i.packages.length) html += `<p style="margin-top:10px"><b>OS packages</b></p>`;
+    }
     if (i.packages.length) {
       html += `<div class="pkg-scroll"><table><tr><th>Package</th><th>Installed</th><th>Available</th></tr>${
         i.packages.map(p => `<tr><td>${esc(p.name)}${p.security ? ' <span class="badge sec">security</span>' : ""}</td><td>${esc(p.current || "—")}</td><td>${esc(p.new)}</td></tr>`).join("")

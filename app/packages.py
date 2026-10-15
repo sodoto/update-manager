@@ -11,6 +11,8 @@ class PackageReport:
     warnings: list[str] = field(default_factory=list)
     reboot_required: bool = False
     has_docker: bool = False
+    community_script: str | None = None  # e.g. "homarr" for an LXC made by ct/homarr.sh
+    app_versions: dict[str, str] = field(default_factory=dict)  # version files, e.g. {".homarr": "1.30.0"}
 
     @property
     def security_count(self) -> int:
@@ -46,6 +48,11 @@ def parse_check_output(output: str) -> PackageReport:
                 report.os_name = value.strip('"')
             elif tag == "DOCKER":
                 report.has_docker = True
+            elif tag == "CS" and value.startswith("ct/") and value.endswith(".sh"):
+                report.community_script = value[3:-3]
+            elif tag == "CSV" and "=" in value:
+                key, _, version = value.partition("=")
+                report.app_versions[key] = version
             continue
         pkg = None
         if report.manager == "apt":

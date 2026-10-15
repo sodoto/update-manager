@@ -4,6 +4,7 @@ One dashboard that shows which of your homelab apps need updates, without checki
 
 - **LXC containers (Proxmox)**: every running LXC is checked for pending OS package updates (apt, apk, dnf/yum, pacman), including security updates and pending reboots. The Proxmox host itself is checked too.
 - **Docker containers**: each container's image digest is compared with the registry (Docker Hub, ghcr.io, lscr.io, quay.io, private registries). If a newer image was published for the same tag, it shows **New image**. Apply it from Dockhand: when Dockhand runs inside an LXC, it is detected automatically and each container links to its own LXC's Dockhand.
+- **Community scripts**: LXCs created with the [Proxmox VE community scripts](https://community-scripts.github.io/ProxmoxVE/) are recognized, and the app they installed is compared with its latest GitHub release (the same check their `update` command does). Apps those scripts update through the OS packages are covered by the package check.
 - **Automatic detection**: new LXCs and containers are picked up on every check, including **Docker running inside an LXC**. Checks run on a schedule, or whenever you click **Check now**.
 - **Everything is configured in the web UI** (Settings page), with a *Test* button for each connection.
 - **Notifications** (optional): ntfy, Discord or a generic webhook, sent only for *new* updates.

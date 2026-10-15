@@ -183,6 +183,15 @@ const Settings = (() => {
       </section>
 
       <section class="panel">
+        <h2>Community scripts</h2>
+        <p class="help">LXCs created with the <a href="https://community-scripts.github.io/ProxmoxVE/" target="_blank" rel="noopener">Proxmox VE
+          community scripts</a> are detected automatically, and their app version is compared with the latest release on GitHub.
+          GitHub allows 60 lookups per hour without a token (results are cached for 6 hours). If you see a rate-limit message,
+          add a token: GitHub → Settings → Developer settings → Fine-grained token, with <b>no permissions</b> (public data only).</p>
+        <div class="grid">${input("GitHub token (optional)", "github_token", { type: "password" })}</div>
+      </section>
+
+      <section class="panel">
         <h2>Notifications</h2>
         <p class="help">Get a message when <b>new</b> updates are found. Leave empty to disable.</p>
         <div class="grid">

@@ -24,8 +24,11 @@ const HowTo = (() => {
     const id = i.vmid;
     const up = UPGRADE[i.manager];
     const kernel = i.packages.some(p => KERNEL.test(p.name));
+    const apps = (i.app_updates || []).filter(a => a.update);
+    const what = [i.update_count ? `${plural(i.update_count, "package")} to update${i.security_count ? `, including ${i.security_count} security` : ""}` : "",
+                  apps.length ? `app update: ${apps.map(a => `${a.name} ${a.current} → ${a.latest}`).join(", ")}` : ""].filter(Boolean);
     let html = `<h3 id="modalTitle">Update ${esc(i.name)} (CT ${id})</h3>
-      <p class="lead">${plural(i.update_count, "package")} to update${i.security_count ? `, including ${i.security_count} security` : ""}.</p>
+      <p class="lead">${esc(what.join(" · ") || "No updates pending.")}</p>
 
       <h4>1. Optional: take a snapshot first</h4>
       <p>In Proxmox: <b>CT ${id} → Snapshots → Take Snapshot</b>, name it <code>before-update</code>.
@@ -36,15 +39,20 @@ const HowTo = (() => {
       ${access(id)}
 
       <h4>3. Install the updates</h4>`;
-    html += up ? `<p>${where(`Inside ${i.name}`)}</p>${cmd(up)}`
-               : `<p>Use the container's package manager to upgrade.</p>`;
+    if (i.community_script) {
+      html += `<p>${where(`Inside ${i.name}`)} This container was created with a community script. Its <code>update</code> command
+        updates the app${apps.length ? ` (${esc(apps.map(a => a.latest).join(", "))})` : ""} and the OS packages:</p>${cmd("update")}
+        <p class="hint">It may ask questions: answer them in the console.</p>`;
+      if (i.update_count && up) html += `<p class="hint">To update only the OS packages instead: <code>${esc(up)}</code></p>`;
+    } else {
+      html += up ? `<p>${where(`Inside ${i.name}`)}</p>${cmd(up)}`
+                 : `<p>Use the container's package manager to upgrade.</p>`;
+    }
     if (i.reboot_required || kernel) {
       html += `<h4>4. Restart the container</h4>
         <p>${where(`Inside ${i.name}`)} ${i.reboot_required ? "The container reports that a restart is required." : "Some updated services only reload after a restart."}</p>
         ${cmd("reboot")}`;
     }
-    html += `<div class="note"><b>Created with a Proxmox VE helper script?</b> Those LXCs also have an <code>update</code> command
-      that updates the app itself (not just the OS packages): run <code>update</code> in the same shell.</div>`;
     return html;
   }
 

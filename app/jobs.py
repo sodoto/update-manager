@@ -30,7 +30,7 @@ def _now() -> str:
 def can_apply(item: dict, action: str) -> bool:
     if action in ("upgrade", "reboot"):
         return item["kind"] == "lxc" and item.get("vmid") is not None and (
-            action == "reboot" or item.get("manager") in MANAGERS)
+            action == "reboot" or (item.get("manager") in MANAGERS and item.get("update_count", 0) > 0))
     if action == "compose-update":
         return (item["kind"] == "docker" and item.get("vmid") is not None
                 and bool(item.get("compose_dir")) and bool(item.get("container_id")))
