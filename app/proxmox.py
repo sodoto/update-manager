@@ -1,0 +1,78 @@
+"""SSH access to a Proxmox VE node through the read-only gateway (see gateway/update-manager-ro.sh).
+
+The app never sends shell code: only the gateway's fixed verbs, which the node validates.
+"""
+import json
+import re
+
+import asyncssh
+
+from .config import ProxmoxNode
+from .keys import ensure_app_key
+
+
+class ProxmoxSession:
+    def __init__(self, node: ProxmoxNode, verify_host_key: bool = True):
+        self.node = node
+        self.verify_host_key = verify_host_key
+        self.conn: asyncssh.SSHClientConnection | None = None
+
+    async def __aenter__(self) -> "ProxmoxSession":
+        known_hosts = None  # no verification unless a host key is trusted in the settings
+        if self.verify_host_key and self.node.host_key:
+            known_hosts = ([asyncssh.import_public_key(self.node.host_key)], [], [])
+        try:
+            self.conn = await asyncssh.connect(
+                self.node.host, port=self.node.port, username=self.node.username,
+                client_keys=[str(ensure_app_key())], agent_path=None, known_hosts=known_hosts,
+                preferred_auth="publickey", connect_timeout=15,
+            )
+        except asyncssh.HostKeyNotVerifiable:
+            raise RuntimeError("SSH host key does not match the trusted key in Settings") from None
+        except asyncssh.PermissionDenied:
+            raise RuntimeError("SSH key not authorized on this node - run the setup snippet from Settings") from None
+        return self
+
+    async def __aexit__(self, *exc):
+        if self.conn:
+            self.conn.close()
+            await self.conn.wait_closed()
+
+    def host_key(self) -> str | None:
+        key = self.conn.get_server_host_key() if self.conn else None
+        return key.export_public_key().decode().strip() if key else None
+
+    async def call(self, *args, timeout: int = 300) -> tuple[int, str, str]:
+        result = await self.conn.run(" ".join(str(a) for a in args), check=False, timeout=timeout)
+        code, out, err = result.exit_status or 0, str(result.stdout or ""), str(result.stderr or "")
+        if code == 126 and "update-manager-ro: refused" in err:
+            raise RuntimeError(f"read-only gateway refused: {args[0]}")
+        return code, out, err
+
+    async def gateway_version(self) -> int | None:
+        _, out, _ = await self.call("version", timeout=30)
+        match = re.match(r"update-manager-ro (\d+)", out.strip())
+        return int(match.group(1)) if match else None
+
+    async def require_gateway(self) -> int:
+        version = await self.gateway_version()
+        if version is None:
+            raise RuntimeError("read-only gateway not installed on this node - run the setup snippet from Settings")
+        return version
+
+    async def list_lxc(self) -> list[dict]:
+        code, out, err = await self.call("list-lxc")
+        if code != 0:
+            raise RuntimeError(f"listing LXCs failed: {err.strip() or out.strip()}")
+        return sorted((c for c in json.loads(out) if not c.get("template")), key=lambda c: int(c["vmid"]))
+
+    async def check_host(self, refresh: bool) -> tuple[int, str, str]:
+        return await self.call("check-host", "refresh" if refresh else "no-refresh")
+
+    async def check_lxc(self, vmid: int, refresh: bool) -> tuple[int, str, str]:
+        return await self.call("check-lxc", int(vmid), "refresh" if refresh else "no-refresh")
+
+    def docker_runner(self, vmid: int):
+        async def run(action: str, ids: list[str]):
+            return await self.call(f"docker-{action}", int(vmid), *ids, timeout=120)
+        return run

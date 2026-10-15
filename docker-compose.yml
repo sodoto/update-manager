@@ -1,0 +1,25 @@
+services:
+  update-manager:
+    build: .
+    image: update-manager:latest
+    container_name: update-manager
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/data  # settings, results and the app's SSH key live here
+
+  # Optional: read-only access to the Docker host this runs on.
+  # In Settings -> Docker hosts, add:  tcp://docker-socket-proxy:2375
+  # POST=0 blocks every request that could change something (start, stop, pull, delete...).
+  docker-socket-proxy:
+    image: tecnativa/docker-socket-proxy:v0.4.1
+    container_name: update-manager-socket-proxy
+    restart: unless-stopped
+    environment:
+      - CONTAINERS=1
+      - IMAGES=1
+      - VERSION=1
+      - POST=0
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro

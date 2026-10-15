@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Update Manager</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='%233b82f6' d='M12 4V1L8 5l4 4V6a6 6 0 1 1-6 6H4a8 8 0 1 0 8-8z'/></svg>">
+<link rel="stylesheet" href="static/style.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Update Manager</h1>
+    <span class="ro-pill" title="This app can only read and check. It cannot install or change anything.">Read-only</span>
+    <nav>
+      <a href="#" id="navDashboard">Dashboard</a>
+      <a href="#settings" id="navSettings">Settings</a>
+    </nav>
+    <span class="spacer"></span>
+    <span class="meta" id="meta"></span>
+    <span class="meta" id="version"></span>
+    <button class="primary" id="checkBtn">Check now</button>
+  </header>
+
+  <main id="dashboardView">
+    <div class="cards" id="cards"></div>
+    <div id="banner"></div>
+    <div class="toolbar">
+      <input id="search" type="search" placeholder="Search by name, image, host…">
+      <select id="kind">
+        <option value="">All types</option>
+        <option value="docker">Docker containers</option>
+        <option value="lxc">LXC containers</option>
+        <option value="host">Proxmox hosts</option>
+      </select>
+    </div>
+    <div id="list"></div>
+  </main>
+
+  <main id="settingsView" hidden></main>
+</div>
+
+<div class="savebar" id="savebar" hidden>
+  <div class="inner">
+    <span class="msg" id="saveMsg">You have unsaved changes</span>
+    <button id="discardBtn">Discard</button>
+    <button class="primary" id="saveBtn">Save settings</button>
+  </div>
+</div>
+
+<script src="static/common.js"></script>
+<script src="static/dashboard.js"></script>
+<script src="static/settings.js"></script>
+</body>
+</html>
