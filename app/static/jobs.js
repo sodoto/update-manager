@@ -11,6 +11,35 @@ const Jobs = (() => {
     return false;
   }
 
+  // What will run, mirroring gateway/update-manager-apply.sh (keep in sync).
+  const UPGRADE = {
+    apt: ["apt-get update",
+          "apt-get -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold dist-upgrade"],
+    apk: ["apk update", "apk upgrade"],
+    dnf: ["dnf -y upgrade"],
+    pacman: ["pacman -Syu --noconfirm"],
+  };
+
+  function commands(i, action) {
+    if (action === "reboot") return [
+      { label: "Update Manager asks Proxmox:", cmd: `reboot-lxc ${i.vmid}` },
+      { label: "Proxmox runs:", cmd: `pct reboot ${i.vmid}` },
+    ];
+    if (action === "compose-update") {
+      const p = i.compose_project ? ` -p ${i.compose_project}` : "";
+      const svc = i.compose_service || "";
+      return [
+        { label: "Update Manager asks Proxmox:", cmd: `compose-update ${i.vmid} ${i.container_id.slice(0, 12)}` },
+        { label: `Proxmox runs inside ${i.lxc_name || `CT ${i.vmid}`}:`,
+          cmd: `cd ${i.compose_dir}\ndocker compose${p} pull ${svc}\ndocker compose${p} up -d ${svc}` },
+      ];
+    }
+    return [
+      { label: "Update Manager asks Proxmox:", cmd: `upgrade-lxc ${i.vmid}` },
+      { label: `Proxmox runs inside CT ${i.vmid} (${i.name}):`, cmd: (UPGRADE[i.manager] || []).join("\n") },
+    ];
+  }
+
   function confirmation(i, action) {
     if (action === "reboot") return {
       title: `Restart ${i.name}?`, ok: "Restart", danger: true,
@@ -30,7 +59,7 @@ const Jobs = (() => {
 
   async function start(item, action) {
     action = action || (item.kind === "docker" ? "compose-update" : "upgrade");
-    if (!(await UI.confirm(confirmation(item, action)))) return;
+    if (!(await UI.confirm({ ...confirmation(item, action), commands: commands(item, action) }))) return;
     try {
       const job = await api("api/jobs", "POST", { id: item.id, action });
       view(job.id);
@@ -64,7 +93,9 @@ const Jobs = (() => {
     if (atBottom) out.scrollTop = out.scrollHeight;
 
     if (job.status === "running") {
-      $("jobStatus").innerHTML = `<span class="spin"></span> Running… you can close this window, it keeps going.`;
+      const secs = Math.max(0, Math.round((Date.now() - new Date(job.started)) / 1000));
+      const elapsed = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, "0")}`;
+      $("jobStatus").innerHTML = `<span class="spin"></span> Running for ${elapsed}… you can close this window, it keeps going.`;
       timer = setTimeout(poll, 1000);
       return;
     }

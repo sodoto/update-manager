@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.8.0 (2026-10-15)
+- The confirmation before an update shows exactly what will run: the action Update Manager asks Proxmox
+  for, and the commands Proxmox runs inside the container.
+- Update output is now really live. apt/dpkg held their output back when writing to a pipe; the update
+  gateway now runs them line-buffered (stdbuf) and prints each command (`+ apt-get update`) before running it.
+- Elapsed time is shown while an update runs.
+- Update gateway v2: paste the update setup block from Settings on each node again (the app reminds you).
+
 ## 1.7.0 (2026-10-15)
 - Built-in sign-in page instead of the browser's login pop-up, with a Log out button.
   You stay signed in for 30 days; changing the password signs out every other browser.

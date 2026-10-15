@@ -12,21 +12,24 @@
 #   compose-update <vmid> <container>  pull + recreate one Docker Compose service inside an LXC; the folder and
 #                                      service come from the container's own labels, never from the caller
 set -u
-VERSION=1
+VERSION=2
 
 read -r -d '' UPGRADE <<'EOF'
 # um-upgrade
 export LC_ALL=C DEBIAN_FRONTEND=noninteractive
+# Programs buffer their output when it goes to a pipe; stdbuf (coreutils) makes it line by line, so it shows live.
+lb=""; command -v stdbuf >/dev/null 2>&1 && lb="stdbuf -oL -eL"
+run() { echo "+ $*"; $lb "$@"; }
 if command -v apt-get >/dev/null 2>&1; then
-  apt-get update && apt-get -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold dist-upgrade
+  run apt-get update && run apt-get -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold dist-upgrade
 elif command -v apk >/dev/null 2>&1; then
-  apk update && apk upgrade
+  run apk update && run apk upgrade
 elif command -v dnf >/dev/null 2>&1; then
-  dnf -y upgrade
+  run dnf -y upgrade
 elif command -v yum >/dev/null 2>&1; then
-  yum -y update
+  run yum -y update
 elif command -v pacman >/dev/null 2>&1; then
-  pacman -Syu --noconfirm
+  run pacman -Syu --noconfirm
 else
   echo "No supported package manager found."; exit 3
 fi
@@ -61,9 +64,10 @@ set -- -p "$proj"
 old_ifs=$IFS; IFS=,
 for f in $files; do [ -f "$f" ] && set -- "$@" -f "$f"; done
 IFS=$old_ifs
-echo "==> $dc pull $svc   (in $dir)"
+echo "+ cd $dir"
+echo "+ $dc $* pull $svc"
 $dc "$@" pull "$svc" || exit $?
-echo "==> $dc up -d $svc"
+echo "+ $dc $* up -d $svc"
 $dc "$@" up -d "$svc"
 EOF
 
@@ -94,6 +98,7 @@ case "${ARGS[0]:-}" in
     [ "$N" -eq 2 ] || deny
     need_vmid
     logger -t update-manager-apply "reboot-lxc $VMID" 2>/dev/null
+    echo "+ pct reboot $VMID"
     exec pct reboot "$VMID" ;;
   compose-update)
     [ "$N" -eq 3 ] || deny

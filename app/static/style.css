@@ -95,7 +95,10 @@ button.link:hover { background: none; text-decoration: underline; }
 
 /* confirmation dialog (above the modal) */
 .modal-backdrop.dialog-layer { z-index: 30; align-items: center; }
-.modal.dialog { max-width: 440px; }
+.modal.dialog { max-width: 520px; }
+.dialog-cmd-label { margin: 12px 0 4px !important; font-size: 12.5px; color: var(--muted); }
+.dialog-cmd { margin: 0; background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px;
+  font: 12.5px/1.5 ui-monospace, Consolas, monospace; white-space: pre-wrap; word-break: break-all; }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
 button.danger-fill { background: var(--red); border-color: var(--red); color: #fff; }
 button.danger-fill:hover { filter: brightness(1.1); background: var(--red); }

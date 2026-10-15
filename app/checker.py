@@ -50,7 +50,8 @@ async def _docker_item(c: ContainerInfo, registry: RegistryClient, group: str, s
                  # Used by the "how to update" instructions.
                  container_id=c.id,
                  compose_dir=c.labels.get("com.docker.compose.project.working_dir"),
-                 compose_service=c.labels.get("com.docker.compose.service"))
+                 compose_service=c.labels.get("com.docker.compose.service"),
+                 compose_project=c.labels.get("com.docker.compose.project"))
     if c.ignored:
         return {**item, "status": "skipped", "note": "ignored by label"}
     if not c.image or c.image.startswith("sha256:"):

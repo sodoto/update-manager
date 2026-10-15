@@ -10,7 +10,7 @@ import itertools
 import logging
 from datetime import datetime, timezone
 
-from .proxmox import UpdateSession
+from .proxmox import APPLY_VERSION, UpdateSession
 
 log = logging.getLogger("update-manager")
 
@@ -115,9 +115,13 @@ class JobRunner:
     async def _run(self, job: Job, node, args: tuple, recheck_id: str) -> None:
         try:
             async with UpdateSession(node) as session:
-                if await session.apply_version() is None:
+                version = await session.apply_version()
+                if version is None:
                     raise RuntimeError(UpdateSession.not_authorized)
-                job.add(f"$ {' '.join(str(a) for a in args)}")
+                if version < APPLY_VERSION:
+                    job.add(f"Note: this node has update gateway v{version}; output may only appear at the end. "
+                            "Paste the update setup block from Settings on this node again for live output.")
+                job.add(f"Update Manager asks Proxmox: {' '.join(str(a) for a in args)}")
                 code = await session.stream(*args, on_line=job.add)
             job.exit_code = code
             job.status = "succeeded" if code == 0 else "failed"

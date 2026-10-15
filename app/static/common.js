@@ -51,10 +51,12 @@ const UI = (() => {
   let resolve = null;
   let returnFocus = null;
 
-  function open({ title, message, ok = "OK", cancel = "Cancel", danger = false }) {
+  // commands: optional [{ label, cmd }] shown as code blocks under the message.
+  function open({ title, message, ok = "OK", cancel = "Cancel", danger = false, commands = [] }) {
     $("dialogTitle").textContent = title;
     $("dialogMsg").innerHTML = String(message || "").split(/\n\s*\n/)
-      .map(p => `<p>${esc(p).replace(/\n/g, "<br>")}</p>`).join("");
+      .map(p => `<p>${esc(p).replace(/\n/g, "<br>")}</p>`).join("")
+      + commands.map(c => `<p class="dialog-cmd-label">${esc(c.label)}</p><pre class="dialog-cmd">${esc(c.cmd)}</pre>`).join("");
     $("dialogOk").textContent = ok;
     $("dialogOk").className = danger ? "danger-fill" : "primary";
     $("dialogCancel").hidden = cancel === null;

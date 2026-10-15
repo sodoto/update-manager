@@ -20,7 +20,7 @@ from .docker_sources import DockerAPISource
 from .jobs import JobBusy, JobRunner
 from .keys import ensure_app_key, public_key, setup_script, update_revoke_script, update_setup_script
 from .notify import send_test
-from .proxmox import GATEWAY_VERSION, ProxmoxSession, UpdateSession
+from .proxmox import APPLY_VERSION, GATEWAY_VERSION, ProxmoxSession, UpdateSession
 from .selfupdate import CURRENT as APP_VERSION, AppUpdates
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -339,6 +339,9 @@ async def test_apply(body: dict = Depends(json_body)):
         return {"ok": False, "message": str(exc) or exc.__class__.__name__}
     if version is None:
         return {"ok": False, "message": "Connected, but the update gateway did not answer. Paste the update setup block again."}
+    if version < APPLY_VERSION:
+        return {"ok": True, "message": f"Update access v{version} works, but v{APPLY_VERSION} is available "
+                                       "(live output): paste the update setup block on this node again"}
     return {"ok": True, "message": f"Update access v{version} OK on this node"}
 
 
