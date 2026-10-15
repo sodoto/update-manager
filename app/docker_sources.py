@@ -6,8 +6,10 @@ from typing import Awaitable, Callable
 import httpx
 
 from .config import DockerHost
+from .registry import parse_image_ref
 
 IGNORE_LABEL = "update-manager.ignore"
+DOCKHAND_PORT = 3000  # Dockhand's default listening port
 
 
 @dataclass
@@ -18,6 +20,8 @@ class ContainerInfo:
     state: str
     repo_digests: list[str] = field(default_factory=list)
     labels: dict[str, str] = field(default_factory=dict)
+    ports: list[tuple[int, int, str]] = field(default_factory=list)  # (container port, host port, host IP)
+    network_mode: str = ""
 
     @property
     def ignored(self) -> bool:
@@ -34,7 +38,39 @@ def _from_inspect(container: dict, images: dict[str, dict]) -> ContainerInfo:
         state=(container.get("State") or {}).get("Status", "unknown"),
         repo_digests=(images.get(image_id) or {}).get("RepoDigests") or [],
         labels=config.get("Labels") or {},
+        ports=_published_ports(container),
+        network_mode=(container.get("HostConfig") or {}).get("NetworkMode", ""),
     )
+
+
+def _published_ports(container: dict) -> list[tuple[int, int, str]]:
+    ports = []
+    for spec, bindings in ((container.get("NetworkSettings") or {}).get("Ports") or {}).items():
+        port, _, proto = spec.partition("/")
+        if proto != "tcp" or not bindings:
+            continue
+        for b in bindings:
+            if b.get("HostPort", "").isdigit():
+                ports.append((int(port), int(b["HostPort"]), b.get("HostIp", "")))
+    return ports
+
+
+def dockhand_port(containers: list[ContainerInfo]) -> int | None:
+    """Port on which a running Dockhand container is reachable from the network, if there is one."""
+    for c in containers:
+        if c.state != "running" or not c.image or c.image.startswith("sha256:"):
+            continue
+        if "dockhand" not in parse_image_ref(c.image).repository.rsplit("/", 1)[-1]:
+            continue
+        if c.network_mode == "host":
+            return DOCKHAND_PORT
+        public = [(cp, hp) for cp, hp, ip in c.ports if ip not in ("127.0.0.1", "::1")]
+        for cp, hp in public:
+            if cp == DOCKHAND_PORT:
+                return hp
+        if public:
+            return public[0][1]
+    return None
 
 
 class DockerAPISource:

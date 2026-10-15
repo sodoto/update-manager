@@ -37,8 +37,9 @@ const Dashboard = (() => {
     $("cards").innerHTML = cards.map(([key, cls, n, label]) =>
       `<div class="card ${cls} ${filter === key ? "active" : ""}" data-filter="${key}"><div class="n">${n}</div><div class="l">${label}</div></div>`).join("");
 
-    $("banner").innerHTML = state.errors.length
-      ? `<div class="banner">${state.errors.map(e => `<div><b>${esc(e.source)}:</b> ${esc(e.message)}</div>`).join("")}</div>` : "";
+    const banner = (list, cls) => list && list.length
+      ? `<div class="banner ${cls}">${list.map(e => `<div><b>${esc(e.source)}:</b> ${esc(e.message)}</div>`).join("")}</div>` : "";
+    $("banner").innerHTML = banner(state.errors, "") + banner(state.warnings, "warn-banner");
 
     if (!state.configured) {
       $("list").innerHTML = `<div class="empty"><b>Nothing configured yet.</b><br>Go to <a href="#settings">Settings</a> to add your Proxmox nodes and Docker hosts.</div>`;
@@ -83,7 +84,7 @@ const Dashboard = (() => {
     const buttons = [];
     if (i.packages.length || i.kind === "docker" || i.note)
       buttons.push(`<button data-toggle="${esc(i.id)}">${open.has(i.id) ? "Hide" : "Details"}</button>`);
-    if (i.link && i.kind === "docker") buttons.push(`<a class="btn" href="${esc(i.link)}" target="_blank" rel="noopener">Dockhand ↗</a>`);
+    if (i.link) buttons.push(`<a class="btn" href="${esc(i.link)}" target="_blank" rel="noopener">Dockhand ↗</a>`);
 
     const detail = i.kind === "docker" ? `<code>${esc(i.detail)}</code>` : esc(i.detail);
     return `<div class="row">

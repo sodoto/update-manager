@@ -87,7 +87,8 @@ const Settings = (() => {
               ${input("SSH port", `proxmox.${i}.port`, { type: "number", kind: "int" })}
               ${input("SSH user", `proxmox.${i}.username`)}
               ${input("Skip these LXC IDs", `proxmox.${i}.exclude`, { kind: "intlist", placeholder: "e.g. 105, 120" })}
-              ${input("Dockhand URL (optional)", `proxmox.${i}.dockhand_url`, { placeholder: "http://192.168.1.20:3000" })}
+              ${input("Fallback Dockhand URL (optional)", `proxmox.${i}.dockhand_url`, { placeholder: "http://192.168.1.20:3000",
+                hint: "Dockhand running inside an LXC is found automatically. This link is only used when it isn't." })}
             </div>
             <div class="checks">
               ${checkbox("Check the Proxmox host's own packages", `proxmox.${i}.check_host`)}
@@ -116,7 +117,8 @@ const Settings = (() => {
             <div class="grid">
               ${input("Name", `docker_hosts.${i}.name`, { placeholder: "nas" })}
               ${input("Docker API URL", `docker_hosts.${i}.url`, { placeholder: "tcp://192.168.1.30:2375", hint: "tcp://host:port, https://host:port or unix:///var/run/docker.sock" })}
-              ${input("Dockhand URL (optional)", `docker_hosts.${i}.dockhand_url`)}
+              ${input("Fallback Dockhand URL (optional)", `docker_hosts.${i}.dockhand_url`, {
+                hint: "Found automatically when Dockhand runs on this host." })}
             </div>
             <div class="checks">${checkbox("Verify TLS certificate (https only)", `docker_hosts.${i}.tls_verify`)}</div>
             ${testResult(`docker_hosts.${i}`)}

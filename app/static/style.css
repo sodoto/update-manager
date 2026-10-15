@@ -48,6 +48,7 @@ code { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size
 .card.upd .n { color: var(--amber); } .card.err .n { color: var(--red); } .card.ok .n { color: var(--green); }
 .banner { background: var(--red-bg); color: var(--red); border-radius: 10px; padding: 10px 14px; margin-bottom: 14px; }
 .banner div + div { margin-top: 4px; }
+.banner.warn-banner { background: var(--amber-bg); color: var(--amber); }
 .toolbar { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; align-items: center; }
 .toolbar input { flex: 1; min-width: 180px; }
 .group { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; margin-bottom: 14px; overflow: hidden; }

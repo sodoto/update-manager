@@ -3,13 +3,14 @@ import asyncio
 import hashlib
 import json
 import logging
+from urllib.parse import urlsplit
 from datetime import datetime, timezone
 
 from .config import DATA_DIR, DockerHost, ProxmoxNode, Settings
-from .docker_sources import ContainerInfo, DockerAPISource, DockerCLISource
+from .docker_sources import ContainerInfo, DockerAPISource, DockerCLISource, dockhand_port
 from .notify import send_notifications
 from .packages import PackageReport, parse_check_output
-from .proxmox import ProxmoxSession
+from .proxmox import GATEWAY_VERSION, ProxmoxSession
 from .registry import RegistryClient, local_digest_for, parse_image_ref
 
 log = logging.getLogger("update-manager")
@@ -72,8 +73,9 @@ class Checker:
         self._lock = asyncio.Lock()
         self.state = {
             "running": False, "last_check_started": None, "last_check_finished": None,
-            "next_check": None, "items": [], "errors": [],
+            "next_check": None, "items": [], "errors": [], "warnings": [],
         }
+        self._warnings: list[dict] = []
         if STATE_FILE.exists():
             try:
                 saved = json.loads(STATE_FILE.read_text(encoding="utf-8"))
@@ -102,6 +104,7 @@ class Checker:
             return
         async with self._lock:
             self.state["last_check_started"] = _now()
+            self._warnings = []
             log.info("Update check started")
             registry = RegistryClient(self.settings.registries)
             sem = asyncio.Semaphore(max(1, self.settings.concurrency))
@@ -130,7 +133,7 @@ class Checker:
                 and not (previous.get(i["id"], {}).get("status") == "update_available"
                          and _signature(previous[i["id"]]) == _signature(i))
             ]
-            self.state.update(items=items, errors=errors, last_check_finished=_now())
+            self.state.update(items=items, errors=errors, warnings=self._warnings, last_check_finished=_now())
             self._save()
             log.info("Update check finished: %d items, %d with updates, %d new",
                      len(items), sum(i["status"] == "update_available" for i in items), len(new_updates))
@@ -140,8 +143,13 @@ class Checker:
         async with sem:
             containers = await DockerAPISource(host).list_containers()
         group = f"docker:{host.name}"
+        link = host.dockhand_url
+        port = dockhand_port(containers)
+        hostname = None if host.url.startswith("unix://") else urlsplit(host.url).hostname
+        if port and hostname:
+            link = f"http://{hostname}:{port}"
         return list(await asyncio.gather(*(
-            _docker_item(c, registry, group, host.name, group, host.dockhand_url) for c in containers
+            _docker_item(c, registry, group, host.name, group, link) for c in containers
         )))
 
     async def _check_node(self, node: ProxmoxNode, registry: RegistryClient, sem) -> list[dict]:
@@ -149,7 +157,11 @@ class Checker:
         items = []
         refresh = self.settings.refresh_package_lists
         async with ProxmoxSession(node) as session:
-            await session.require_gateway()
+            version = await session.require_gateway()
+            if version < GATEWAY_VERSION:
+                self._warnings.append({"source": node.name, "message":
+                    f"read-only gateway v{version} is outdated (v{GATEWAY_VERSION} available): paste the setup "
+                    "block from Settings on this node again to enable automatic Dockhand links."})
             if node.check_host:
                 item = _item("host", f"host:{node.name}", group, node.name, node.name, "Proxmox host", node=node.name)
                 async with sem:
@@ -189,8 +201,15 @@ class Checker:
             try:
                 async with sem:
                     containers = await DockerCLISource(session.docker_runner(vmid)).list_containers()
+                link = node.dockhand_url
+                port = dockhand_port(containers)
+                if port:
+                    ip = await session.lxc_ip(vmid)
+                    if ip:
+                        link = f"http://{ip}:{port}"
+                        item["link"] = link  # this LXC runs its own Dockhand
                 items += await asyncio.gather(*(
-                    _docker_item(c, registry, group, source, id_prefix, node.dockhand_url) for c in containers
+                    _docker_item(c, registry, group, source, id_prefix, link) for c in containers
                 ))
             except Exception as exc:
                 items.append(_item("docker", f"{id_prefix}:*", group, source, f"Docker in {name}", "",

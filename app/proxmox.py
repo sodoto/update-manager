@@ -10,12 +10,15 @@ import asyncssh
 from .config import ProxmoxNode
 from .keys import ensure_app_key
 
+GATEWAY_VERSION = 2  # version of gateway/update-manager-ro.sh this app ships
+
 
 class ProxmoxSession:
     def __init__(self, node: ProxmoxNode, verify_host_key: bool = True):
         self.node = node
         self.verify_host_key = verify_host_key
         self.conn: asyncssh.SSHClientConnection | None = None
+        self.gateway = 0
 
     async def __aenter__(self) -> "ProxmoxSession":
         known_hosts = None  # no verification unless a host key is trusted in the settings
@@ -58,6 +61,7 @@ class ProxmoxSession:
         version = await self.gateway_version()
         if version is None:
             raise RuntimeError("read-only gateway not installed on this node - run the setup snippet from Settings")
+        self.gateway = version
         return version
 
     async def list_lxc(self) -> list[dict]:
@@ -65,6 +69,22 @@ class ProxmoxSession:
         if code != 0:
             raise RuntimeError(f"listing LXCs failed: {err.strip() or out.strip()}")
         return sorted((c for c in json.loads(out) if not c.get("template")), key=lambda c: int(c["vmid"]))
+
+    async def lxc_ip(self, vmid: int) -> str | None:
+        """First IPv4 address of a running LXC (needs gateway v2)."""
+        if self.gateway < 2:
+            return None
+        try:
+            code, out, _ = await self.call("lxc-interfaces", int(vmid), timeout=30)
+            if code != 0:
+                return None
+            for iface in json.loads(out):
+                inet = iface.get("inet") or ""
+                if iface.get("name") != "lo" and inet and not inet.startswith("127."):
+                    return inet.split("/")[0]
+        except Exception:
+            return None
+        return None
 
     async def check_host(self, refresh: bool) -> tuple[int, str, str]:
         return await self.call("check-host", "refresh" if refresh else "no-refresh")

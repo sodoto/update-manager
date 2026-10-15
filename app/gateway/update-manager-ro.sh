@@ -7,7 +7,7 @@
 # The only thing a check may write is the package index cache (apt-get update / apk update),
 # and only when the app asks for "refresh" - installed software is never touched.
 set -u
-VERSION=1
+VERSION=2
 
 read -r -d '' CHECK <<'EOF'
 export LC_ALL=C
@@ -62,6 +62,10 @@ case "${ARGS[0]:-}" in
   list-lxc)
     [ "$N" -eq 1 ] || deny
     exec pvesh get "/nodes/$(hostname)/lxc" --output-format json ;;
+  lxc-interfaces)
+    [ "$N" -eq 2 ] || deny
+    need_vmid
+    exec pvesh get "/nodes/$(hostname)/lxc/$VMID/interfaces" --output-format json ;;
   check-host)
     [ "$N" -eq 2 ] || deny
     need_refresh "${ARGS[1]}"

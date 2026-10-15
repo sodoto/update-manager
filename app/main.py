@@ -18,7 +18,7 @@ from .config import (CONFIG_PATH, DockerHost, Notify, ProxmoxNode, Settings, loa
 from .docker_sources import DockerAPISource
 from .keys import ensure_app_key, public_key, setup_script
 from .notify import send_test
-from .proxmox import ProxmoxSession
+from .proxmox import GATEWAY_VERSION, ProxmoxSession
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("update-manager")
@@ -207,8 +207,10 @@ async def test_proxmox(body: dict = Depends(json_body)):
     except Exception as exc:
         return {"ok": False, "message": str(exc) or exc.__class__.__name__}
     running = sum(1 for c in containers if c.get("status") == "running")
-    return {"ok": True, "host_key": host_key,
-            "message": f"Read-only gateway v{version} OK - {len(containers)} LXC(s), {running} running"}
+    message = f"Read-only gateway v{version} OK - {len(containers)} LXC(s), {running} running"
+    if version < GATEWAY_VERSION:
+        message += f" · Gateway outdated (v{GATEWAY_VERSION} available): paste the setup block again"
+    return {"ok": True, "host_key": host_key, "message": message}
 
 
 @app.post("/api/test/docker", dependencies=[Depends(require_auth)])
