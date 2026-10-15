@@ -63,12 +63,19 @@ class Settings(_Model):
     concurrency: int = Field(default=4, ge=1, le=32)
     check_app_updates: bool = True  # look on GitHub for new versions of Update Manager
     allow_self_update: bool = True  # allow updating Update Manager from the dashboard (LXC install)
+    allow_updates: bool = False  # allow installing updates on LXCs (needs the update key on each node)
     ui_username: str | None = None
     ui_password: str | None = None
     docker_hosts: list[DockerHost] = Field(default_factory=list)
     proxmox: list[ProxmoxNode] = Field(default_factory=list)
     registries: list[RegistryAuth] = Field(default_factory=list)
     notify: Notify = Field(default_factory=Notify)
+
+    @model_validator(mode="after")
+    def _updates_need_login(self):
+        if self.allow_updates and not (self.ui_username and self.ui_password):
+            raise ValueError("set a dashboard login (username and password) before allowing updates")
+        return self
 
     @model_validator(mode="after")
     def _unique_names(self):

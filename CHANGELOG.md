@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.6.0 (2026-10-15)
+- Optional: run updates from the app. An **Update** button installs package updates in an LXC or updates a
+  Docker Compose container, with live output, then re-checks the row. Offers to restart the LXC when needed.
+- Uses a second SSH key locked to a new gateway (`update-manager-apply`) that only allows those actions.
+  Off by default, requires a dashboard login. Paste the update setup block from Settings on each node.
+- The browser always loads the current scripts after an update (no more stale cached pages).
+
 ## 1.5.0 (2026-10-15)
 - ↻ button on every row to check just that item again: an LXC (with the Docker containers inside it),
   a single Docker container, or the Proxmox host. Handy right after updating something.

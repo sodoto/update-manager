@@ -73,6 +73,30 @@ const Settings = (() => {
       </section>
 
       <section class="panel">
+        <h2>Run updates from the app</h2>
+        <p class="help">Off: Update Manager is strictly <b>read-only</b>. On: an <b>Update</b> button installs package updates in LXCs
+          and updates Docker Compose containers. It uses a <b>second, separate key</b> that can only do that; checks keep using the read-only key.</p>
+        ${s.ui_username && s.ui_password ? "" : `<div class="warn">Set a dashboard login first (Dashboard login, below). It is required to turn this on.</div>`}
+        <div class="checks">${checkbox("Allow Update Manager to install updates", "allow_updates")}</div>
+        ${s.allow_updates ? `
+        <details class="setup" open>
+          <summary>Update access: run once on each Proxmox node</summary>
+          <ol>
+            <li>In Proxmox, open <b>your node → Shell</b>, paste the block below and press Enter.</li>
+            <li>Save these settings, then click <b>Test update access</b> on the node below.</li>
+          </ol>
+          <textarea class="code" readonly>${esc(meta.update_setup_script)}</textarea>
+          <div style="margin-top:8px"><button class="small" data-action="copy" data-copy-key="update_setup_script">Copy</button></div>
+          <p class="help" style="margin-top:10px">Installs <code>/usr/local/bin/update-manager-apply</code>. That key can <b>only</b>: install package
+            updates in an LXC, restart an LXC, and update one Docker Compose service (folder and service read from the container's own labels).
+            Nothing else: no shell, no other commands.</p>
+          <p class="help">To go back to read-only, uncheck the box above and run this on each node:</p>
+          <textarea class="code" readonly style="height:60px">${esc(meta.update_revoke_script)}</textarea>
+          <div style="margin-top:8px"><button class="small" data-action="copy" data-copy-key="update_revoke_script">Copy</button></div>
+        </details>` : ""}
+      </section>
+
+      <section class="panel">
         <h2>Proxmox nodes</h2>
         <p class="help">Every running LXC on these nodes is checked, plus the node itself. Docker inside an LXC is detected automatically.
           Access is <b>read-only</b>: the app's SSH key can only run a small gateway script that allows reading, never changing.</p>
@@ -94,6 +118,7 @@ const Settings = (() => {
           <div class="sub-card">
             <div class="head"><b>${esc(n.name || "New node")}</b>
               <button class="small" data-action="test-proxmox" data-index="${i}">Test connection</button>
+              ${s.allow_updates ? `<button class="small" data-action="test-apply" data-index="${i}">Test update access</button>` : ""}
               <button class="small danger" data-action="remove" data-list="proxmox" data-index="${i}">Remove</button></div>
             <div class="grid">
               ${input("Name", `proxmox.${i}.name`, { placeholder: "pve" })}
@@ -114,6 +139,7 @@ const Settings = (() => {
               ${n.host_key ? `<button class="small" data-action="forget-key" data-index="${i}">Forget</button>` : ""}</div>
               <div class="hint">Protects against connecting to the wrong machine.</div></div>
             ${testResult(`proxmox.${i}`)}
+            ${testResult(`apply.${i}`)}
           </div>`).join("")}
         <button class="add" data-action="add" data-list="proxmox">+ Add Proxmox node</button>
       </section>
@@ -256,6 +282,7 @@ const Settings = (() => {
     else if (kind === "intlist") value = value.split(/[\s,;]+/).filter(Boolean).map(Number).filter(Number.isInteger);
     else if (value === "") value = null;
     setPath(el.dataset.path, value);
+    if (el.dataset.path === "allow_updates") render();  // show / hide the update setup block
     updateSavebar();
   });
 
@@ -288,6 +315,13 @@ const Settings = (() => {
             res.message += " · Host key trusted; save to keep it.";
           }
         });
+        break;
+      case "test-apply":
+        await runTest(`apply.${i}`, "api/test/apply", data.proxmox[i]);
+        break;
+      case "copy":
+        btn.textContent = (await copyText(meta[btn.dataset.copyKey])) ? "Copied!" : "Copy failed: select and copy manually";
+        setTimeout(() => { btn.textContent = "Copy"; }, 2500);
         break;
       case "test-docker":
         await runTest(`docker_hosts.${i}`, "api/test/docker", data.docker_hosts[i]);

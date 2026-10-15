@@ -25,6 +25,7 @@ nav { display: flex; gap: 4px; background: var(--panel-2); padding: 3px; border-
 nav a { color: var(--muted); text-decoration: none; padding: 5px 12px; border-radius: 7px; font-weight: 500; }
 nav a.active { background: var(--panel); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
 .ro-pill { font-size: 12px; color: var(--green); background: var(--green-bg); padding: 2px 9px; border-radius: 999px; }
+.ro-pill.rw { color: var(--amber); background: var(--amber-bg); }
 button, .btn { font: inherit; border: 1px solid var(--border); background: var(--panel); color: var(--text);
   padding: 7px 14px; border-radius: 8px; cursor: pointer; text-decoration: none; display: inline-flex;
   align-items: center; gap: 6px; white-space: nowrap; }
@@ -76,6 +77,12 @@ button.link:hover { background: none; text-decoration: underline; }
 .version-btn { color: var(--muted); font-weight: 500; }
 .modal ul { margin: 4px 0 8px; padding-left: 20px; }
 .modal li { margin: 3px 0; }
+
+/* update jobs */
+.job-output { max-height: 50vh; overflow: auto; min-height: 120px; white-space: pre-wrap; }
+.ok-text { color: var(--green); font-weight: 600; }
+.bad-text { color: var(--red); font-weight: 600; }
+.run-note { display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; margin: 10px 0 4px; }
 
 /* modal */
 .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 20; display: flex;

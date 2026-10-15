@@ -1,13 +1,14 @@
 """Update Manager web app: dashboard, settings, API and periodic scheduler. Read-only by design."""
 import asyncio
 import logging
+import re
 import secrets
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse
+from fastapi.responses import HTMLResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
@@ -16,9 +17,10 @@ from .checker import CheckBusy, Checker
 from .config import (CONFIG_PATH, DockerHost, Notify, ProxmoxNode, Settings, load_settings,
                      save_settings, validation_message)
 from .docker_sources import DockerAPISource
-from .keys import ensure_app_key, public_key, setup_script
+from .jobs import JobBusy, JobRunner
+from .keys import ensure_app_key, public_key, setup_script, update_revoke_script, update_setup_script
 from .notify import send_test
-from .proxmox import GATEWAY_VERSION, ProxmoxSession
+from .proxmox import GATEWAY_VERSION, ProxmoxSession, UpdateSession
 from .selfupdate import CURRENT as APP_VERSION, AppUpdates
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -31,6 +33,7 @@ MASK = "********"
 APP_CHECK_INTERVAL = 6 * 3600
 checker = Checker(load_settings())
 app_updates = AppUpdates()
+jobs = JobRunner(checker)
 _background: set[asyncio.Task] = set()
 _scheduler_task: asyncio.Task | None = None
 
@@ -163,12 +166,16 @@ async def health():
 
 @app.get("/", dependencies=[Depends(require_auth)])
 async def index():
-    return FileResponse(STATIC / "index.html")
+    # Version-stamp the scripts and styles so browsers fetch fresh copies after every update.
+    html = (STATIC / "index.html").read_text(encoding="utf-8")
+    html = re.sub(r'(static/[\w.-]+\.(?:js|css))"', rf'\1?v={APP_VERSION}"', html)
+    return HTMLResponse(html, headers={"Cache-Control": "no-cache"})
 
 
 @app.get("/api/state", dependencies=[Depends(require_auth)])
 async def state():
     return {**checker.public_state(), "version": APP_VERSION,
+            "allow_updates": checker.settings.allow_updates, "jobs": jobs.summaries(),
             "app": app_updates.public(checker.settings.allow_self_update)}
 
 
@@ -220,6 +227,8 @@ async def get_settings():
         "settings": _masked(checker.settings),
         "public_key": public_key(),
         "setup_script": setup_script(),
+        "update_setup_script": update_setup_script(),
+        "update_revoke_script": update_revoke_script(),
         "config_path": str(CONFIG_PATH),
     }
 
@@ -256,6 +265,42 @@ async def test_proxmox(body: dict = Depends(json_body)):
     if version < GATEWAY_VERSION:
         message += f" · Gateway outdated (v{GATEWAY_VERSION} available): paste the setup block again"
     return {"ok": True, "host_key": host_key, "message": message}
+
+
+@app.post("/api/test/apply", dependencies=[Depends(require_auth)])
+async def test_apply(body: dict = Depends(json_body)):
+    node = _validate(ProxmoxNode, body)
+    try:
+        async with UpdateSession(node) as session:
+            version = await session.apply_version()
+    except Exception as exc:
+        return {"ok": False, "message": str(exc) or exc.__class__.__name__}
+    if version is None:
+        return {"ok": False, "message": "Connected, but the update gateway did not answer. Paste the update setup block again."}
+    return {"ok": True, "message": f"Update access v{version} OK on this node"}
+
+
+@app.post("/api/jobs", dependencies=[Depends(require_auth)])
+async def start_job(body: dict = Depends(json_body)):
+    if not checker.settings.allow_updates:
+        raise HTTPException(403, "Running updates is turned off (Settings > Run updates)")
+    item = next((i for i in checker.state["items"] if i["id"] == body.get("id")), None)
+    if not item:
+        raise HTTPException(404, "this item is no longer in the results")
+    try:
+        return jobs.start(item, str(body.get("action", ""))).summary()
+    except JobBusy as exc:
+        raise HTTPException(409, str(exc))
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+
+
+@app.get("/api/jobs/{job_id}", dependencies=[Depends(require_auth)])
+async def get_job(job_id: str):
+    job = jobs.jobs.get(job_id)
+    if not job:
+        raise HTTPException(404, "unknown job")
+    return job.detail()
 
 
 @app.post("/api/test/docker", dependencies=[Depends(require_auth)])

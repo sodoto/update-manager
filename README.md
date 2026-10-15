@@ -1,6 +1,6 @@
 # Update Manager
 
-One dashboard that shows which of your homelab apps need updates, without checking each one by hand. It is **read-only**: it can look, but it can never install, restart or change anything.
+One dashboard that shows which of your homelab apps need updates, without checking each one by hand. It is **read-only by default**: it looks, but never installs, restarts or changes anything. You can optionally allow it to run updates for you, through a separate, tightly restricted key.
 
 - **LXC containers (Proxmox)**: every running LXC is checked for pending OS package updates (apt, apk, dnf/yum, pacman), including security updates and pending reboots. The Proxmox host itself is checked too.
 - **Docker containers**: each container's image digest is compared with the registry (Docker Hub, ghcr.io, lscr.io, quay.io, private registries). If a newer image was published for the same tag, it shows **New image**. Apply it from Dockhand: when Dockhand runs inside an LXC, it is detected automatically and each container links to its own LXC's Dockhand.
@@ -16,11 +16,23 @@ The app's limits are enforced by the systems it connects to, not just by the app
 |---|---|
 | Proxmox | The app's SSH key is locked in `authorized_keys` with `command="/usr/local/bin/update-manager-ro",restrict`. Whatever the app sends, Proxmox only runs that gateway script. The script accepts a fixed list of read commands (list LXCs, check packages, `docker ps`/`inspect`), validates every argument, and refuses everything else. The key gets no shell, no port forwarding and no file transfer. |
 | Docker hosts | Use a docker-socket-proxy with `POST=0`. It blocks every request that changes something (start, stop, pull, delete…). The app itself only sends GET requests. |
-| The app | It contains no upgrade or write code at all. |
 
 The only thing a check writes is the **package list cache** (`apt-get update` / `apk update`), so it knows which versions exist. It never installs anything. You can turn this off in Settings: *Refresh package lists before checking*.
 
 The gateway script is [app/gateway/update-manager-ro.sh](app/gateway/update-manager-ro.sh); read it before installing.
+
+## Optional: run updates from the app
+
+Off by default. When enabled (**Settings → Run updates from the app**), rows with updates get an **Update** button that shows the live output and re-checks the row when done.
+
+- It uses a **second SSH key**, installed with its own setup block. It is locked to [app/gateway/update-manager-apply.sh](app/gateway/update-manager-apply.sh), which allows only three actions:
+  - install package updates inside an LXC (non-interactive, your config files are kept);
+  - restart an LXC;
+  - update one Docker Compose service inside an LXC (`docker compose pull` + `up -d`). The folder and service are read from the container's own labels on the node, never taken from the app.
+- The Proxmox host itself is never updated by the app, and containers not started with Docker Compose are left to Dockhand.
+- Checks keep using the read-only key.
+- It requires a dashboard login, so nobody on your network can install updates without the password.
+- To go back to read-only, uncheck the setting and run the revoke command shown under it on each node.
 
 ## Install in an LXC (Proxmox)
 

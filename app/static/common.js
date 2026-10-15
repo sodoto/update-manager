@@ -7,7 +7,8 @@ async function api(path, method = "GET", body) {
     opts.headers["Content-Type"] = "application/json";
     opts.body = JSON.stringify(body);
   }
-  const r = await fetch(path, opts);
+  // Resolve against the origin, not the page URL: a page opened as http://user:pass@host/ can't fetch relative URLs.
+  const r = await fetch(new URL(path, location.origin + location.pathname), opts);
   let data = null;
   try { data = await r.json(); } catch { /* empty body */ }
   if (!r.ok) throw new Error((data && data.detail) || `HTTP ${r.status}`);

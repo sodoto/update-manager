@@ -102,9 +102,14 @@ const HowTo = (() => {
     $("modalClose").focus();
   }
 
-  function open(item) {
+  function open(item, allowUpdates) {
     if (!item) return;
-    const body = item.kind === "lxc" ? lxc(item) : item.kind === "host" ? host(item) : docker(item);
+    let body = item.kind === "lxc" ? lxc(item) : item.kind === "host" ? host(item) : docker(item);
+    if (allowUpdates && Jobs.canApply(item)) {
+      // Offer to run it from the app, right under the title.
+      body = body.replace("</h3>", `</h3><div class="note run-note"><span>Update Manager can do this for you.</span>
+        <button class="primary" data-apply="${esc(item.id)}">Update now</button></div>`);
+    }
     show(body + `<p class="hint" style="margin-top:16px">When you're done, click <b>Check now</b> to refresh the dashboard.</p>`);
   }
 

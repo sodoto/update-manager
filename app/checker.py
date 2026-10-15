@@ -48,6 +48,7 @@ async def _docker_item(c: ContainerInfo, registry: RegistryClient, group: str, s
     item = _item("docker", f"{id_prefix}:{c.name}", group, source, c.name, c.image, state=c.state, link=link,
                  vmid=vmid,
                  # Used by the "how to update" instructions.
+                 container_id=c.id,
                  compose_dir=c.labels.get("com.docker.compose.project.working_dir"),
                  compose_service=c.labels.get("com.docker.compose.service"))
     if c.ignored:

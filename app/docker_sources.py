@@ -14,6 +14,7 @@ DOCKHAND_PORT = 3000  # Dockhand's default listening port
 
 @dataclass
 class ContainerInfo:
+    id: str
     name: str
     image: str  # image reference the container was created from, e.g. "nginx:latest"
     image_id: str
@@ -32,6 +33,7 @@ def _from_inspect(container: dict, images: dict[str, dict]) -> ContainerInfo:
     image_id = container.get("Image", "")
     config = container.get("Config") or {}
     return ContainerInfo(
+        id=container.get("Id", ""),
         name=container.get("Name", "").lstrip("/"),
         image=config.get("Image", ""),
         image_id=image_id,

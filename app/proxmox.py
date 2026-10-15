@@ -2,18 +2,26 @@
 
 The app never sends shell code: only the gateway's fixed verbs, which the node validates.
 """
+import asyncio
 import json
 import re
+from typing import Callable
 
 import asyncssh
 
 from .config import ProxmoxNode
-from .keys import ensure_app_key
+from .keys import ensure_app_key, ensure_update_key
 
 GATEWAY_VERSION = 2  # version of gateway/update-manager-ro.sh this app ships
 
 
 class ProxmoxSession:
+    not_authorized = "SSH key not authorized on this node - run the setup snippet from Settings"
+
+    @staticmethod
+    def _key() -> str:
+        return str(ensure_app_key())
+
     def __init__(self, node: ProxmoxNode, verify_host_key: bool = True):
         self.node = node
         self.verify_host_key = verify_host_key
@@ -27,13 +35,13 @@ class ProxmoxSession:
         try:
             self.conn = await asyncssh.connect(
                 self.node.host, port=self.node.port, username=self.node.username,
-                client_keys=[str(ensure_app_key())], agent_path=None, known_hosts=known_hosts,
+                client_keys=[self._key()], agent_path=None, known_hosts=known_hosts,
                 preferred_auth="publickey", connect_timeout=15,
             )
         except asyncssh.HostKeyNotVerifiable:
             raise RuntimeError("SSH host key does not match the trusted key in Settings") from None
         except asyncssh.PermissionDenied:
-            raise RuntimeError("SSH key not authorized on this node - run the setup snippet from Settings") from None
+            raise RuntimeError(self.not_authorized) from None
         return self
 
     async def __aexit__(self, *exc):
@@ -96,3 +104,34 @@ class ProxmoxSession:
         async def run(action: str, ids: list[str]):
             return await self.call(f"docker-{action}", int(vmid), *ids, timeout=120)
         return run
+
+
+class UpdateSession(ProxmoxSession):
+    """Connection with the optional update key, locked on the node to gateway/update-manager-apply.sh."""
+    not_authorized = ("update access is not installed on this node - paste the update setup block "
+                      "from Settings > Run updates on this node")
+
+    @staticmethod
+    def _key() -> str:
+        return str(ensure_update_key())
+
+    async def apply_version(self) -> int | None:
+        result = await self.conn.run("version", check=False, timeout=30)
+        match = re.match(r"update-manager-apply (\d+)", str(result.stdout or "").strip())
+        return int(match.group(1)) if match else None
+
+    async def stream(self, *args, on_line: Callable[[str], None], timeout: int = 3600) -> int:
+        """Runs a gateway action, passing each output line (stdout and stderr) to on_line as it arrives."""
+        process = await self.conn.create_process(" ".join(str(a) for a in args), stderr=asyncssh.STDOUT)
+
+        async def pump():
+            async for line in process.stdout:
+                on_line(line.rstrip())
+            await process.wait()
+
+        try:
+            await asyncio.wait_for(pump(), timeout)
+        except asyncio.TimeoutError:
+            process.kill()
+            raise RuntimeError(f"timed out after {timeout // 60} minutes") from None
+        return process.exit_status if process.exit_status is not None else -1

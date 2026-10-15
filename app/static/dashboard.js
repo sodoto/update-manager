@@ -26,12 +26,19 @@ const Dashboard = (() => {
     } catch (e) {
       $("meta").textContent = `Cannot reach server (${e.message})`;
     }
-    timer = setTimeout(load, state && state.running ? 3000 : 30000);
+    const active = state && (state.running || (state.jobs || []).some(j => !j.done));
+    timer = setTimeout(load, active ? 3000 : 30000);
   }
 
   function render() {
     const items = state.items;
     const count = (fn) => items.filter(fn).length;
+    const pill = $("modePill");
+    pill.textContent = state.allow_updates ? "Updates enabled" : "Read-only";
+    pill.classList.toggle("rw", !!state.allow_updates);
+    pill.title = state.allow_updates
+      ? "Update Manager can install updates in your LXCs and Docker Compose containers when you click Update. Turn this off in Settings."
+      : "Update Manager only reads and checks. It never changes your Proxmox host, containers or Docker.";
     const btn = $("checkBtn");
     btn.disabled = state.running;
     btn.innerHTML = state.running ? '<span class="spin"></span> Checking…' : "Check now";
@@ -102,6 +109,10 @@ const Dashboard = (() => {
     buttons.push(`<button class="icon-btn" data-recheck="${esc(i.id)}" ${busy || state.running ? "disabled" : ""}
       title="${i.kind === "lxc" ? "Check this container again (and its Docker containers)" : "Check this again"}"
       aria-label="Check ${esc(i.name)} again">${busy ? '<span class="spin"></span>' : "↻"}</button>`);
+    const job = (state.jobs || []).find(j => j.item_id === i.id && !j.done);
+    if (job) buttons.push(`<button class="small" data-job-view="${esc(job.id)}"><span class="spin"></span> Updating…</button>`);
+    else if (state.allow_updates && i.status === "update_available" && Jobs.canApply(i))
+      buttons.push(`<button class="primary" data-apply="${esc(i.id)}">Update</button>`);
     if (i.status === "update_available")
       buttons.push(`<button class="icon-btn" data-howto="${esc(i.id)}" title="How to update" aria-label="How to update ${esc(i.name)}">i</button>`);
     if (i.packages.length || i.kind === "docker" || i.note)
@@ -165,7 +176,7 @@ const Dashboard = (() => {
     const rc = e.target.closest("[data-recheck]");
     if (rc) { recheck(rc.dataset.recheck); return; }
     const h = e.target.closest("[data-howto]");
-    if (h) { HowTo.open(state.items.find(i => i.id === h.dataset.howto)); return; }
+    if (h) { HowTo.open(state.items.find(i => i.id === h.dataset.howto), state.allow_updates); return; }
     const g = e.target.closest("[data-group]");
     if (g) {
       const name = g.dataset.group;
@@ -188,5 +199,5 @@ const Dashboard = (() => {
   $("kind").addEventListener("change", () => state && render());
   $("checkBtn").addEventListener("click", checkNow);
 
-  return { load };
+  return { load, item: (id) => state && state.items.find(i => i.id === id) };
 })();
