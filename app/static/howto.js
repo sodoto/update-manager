@@ -15,6 +15,12 @@ const HowTo = (() => {
   const arg = (s) => /^[\w@%+=:,./-]+$/.test(s) ? s : shq(s);  // quote only when needed
   const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
+  // How to get a shell inside an LXC: the Proxmox console, or SSH when we know its IP.
+  function access(id, name, ip) {
+    return `<p>${where(`Inside ${name}`)} Open a shell in the container: Proxmox → <b>CT ${id} → Console</b>${ip ? ", or with SSH:" : "."}</p>
+      ${ip ? cmd(`ssh root@${ip}`) + `<p class="hint">SSH only works if it is enabled in the container. The console always works.</p>` : ""}`;
+  }
+
   function lxc(i) {
     const id = i.vmid;
     const up = UPGRADE[i.manager];
@@ -23,26 +29,23 @@ const HowTo = (() => {
       <p class="lead">${plural(i.update_count, "package")} to update${i.security_count ? `, including ${i.security_count} security` : ""}.</p>
 
       <h4>1. Optional: take a snapshot first</h4>
-      <p>${where("Proxmox Shell")} Lets you roll back if something breaks.</p>
-      ${cmd(`pct snapshot ${id} before-update`)}
-      <p class="hint">Needs storage with snapshot support (ZFS, LVM-thin, Ceph). Otherwise use CT ${id} → Backup → Backup now.
-        To roll back: <code>pct rollback ${id} before-update</code>.</p>
+      <p>In Proxmox: <b>CT ${id} → Snapshots → Take Snapshot</b>, name it <code>before-update</code>.
+        If something breaks, select it there and click <b>Rollback</b>.</p>
+      <p class="hint">Needs storage with snapshot support (ZFS, LVM-thin, Ceph). Otherwise use CT ${id} → Backup → Backup now.</p>
 
-      <h4>2. Install the updates</h4>`;
-    if (up) {
-      html += `<p>${where("Proxmox Shell")} Datacenter → ${esc(i.node || "your node")} → Shell, then:</p>
-        ${cmd(`pct exec ${id} -- sh -c ${shq(up)}`)}
-        <p class="hint">Or open CT ${id} → Console and run <code>${esc(up)}</code> directly.</p>`;
-    } else {
-      html += `<p>Open CT ${id} → Console and use the container's package manager to upgrade.</p>`;
-    }
+      <h4>2. Open the container's shell</h4>
+      ${access(id, i.name, i.ip)}
+
+      <h4>3. Install the updates</h4>`;
+    html += up ? `<p>${where(`Inside ${i.name}`)}</p>${cmd(up)}`
+               : `<p>Use the container's package manager to upgrade.</p>`;
     if (i.reboot_required || kernel) {
-      html += `<h4>3. Restart the container</h4>
-        <p>${where("Proxmox Shell")} ${i.reboot_required ? "The container reports that a restart is required." : "Some updated services only reload after a restart."}</p>
-        ${cmd(`pct reboot ${id}`)}`;
+      html += `<h4>4. Restart the container</h4>
+        <p>${where(`Inside ${i.name}`)} ${i.reboot_required ? "The container reports that a restart is required." : "Some updated services only reload after a restart."}</p>
+        ${cmd("reboot")}`;
     }
     html += `<div class="note"><b>Created with a Proxmox VE helper script?</b> Those LXCs also have an <code>update</code> command
-      that updates the app itself (not just the OS packages): run <code>update</code> in CT ${id}'s console.</div>`;
+      that updates the app itself (not just the OS packages): run <code>update</code> in the same shell.</div>`;
     return html;
   }
 
@@ -65,8 +68,8 @@ const HowTo = (() => {
 
   function docker(i) {
     const inLxc = i.vmid != null;
-    const run = (c) => inLxc ? `pct exec ${i.vmid} -- sh -c ${shq(c)}` : c;
-    const place = inLxc ? where("Proxmox Shell") : where(`On ${i.source}`);
+    const lxcName = i.lxc_name || `CT ${i.vmid}`;
+    const place = inLxc ? where(`Inside ${lxcName}`) : where(`On ${i.source}`);
     let html = `<h3 id="modalTitle">Update container ${esc(i.name)}</h3>
       <p class="lead">A newer image was published for <code>${esc(i.detail)}</code>. Updating means pulling the new image
         and recreating the container. Data in volumes and bind mounts is kept.</p>
@@ -75,21 +78,22 @@ const HowTo = (() => {
       <p>${i.link ? `<a class="btn" href="${esc(i.link)}" target="_blank" rel="noopener">Open Dockhand ↗</a>` : "Open the Dockhand that manages this container."}</p>
       <p class="hint">Find the container (or its stack) and use its update / redeploy action, which pulls the new image and recreates it.</p>
 
-      <h4>Option B: command line</h4>`;
+      <h4>Option B: command line</h4>
+      ${inLxc ? access(i.vmid, lxcName, i.ip) : `<p>Open a shell on <b>${esc(i.source)}</b>.</p>`}`;
     if (i.compose_dir) {
       const svc = i.compose_service ? ` ${i.compose_service}` : "";
       html += `<p>${place} This container belongs to the Compose project in <code>${esc(i.compose_dir)}</code>:</p>
-        ${cmd(run(`cd ${arg(i.compose_dir)} && docker compose pull${svc} && docker compose up -d${svc}`))}
+        ${cmd(`cd ${arg(i.compose_dir)} && docker compose pull${svc} && docker compose up -d${svc}`)}
         <p class="hint">If Dockhand created this stack, the folder may only exist inside Dockhand. If the command says
           "no such file or directory", use option A.</p>`;
     } else {
       html += `<p>This container wasn't started with Docker Compose, so it has to be recreated with the same settings.
         Use option A, or recreate it the way you created it. To download the new image first:</p>
-        <p>${place}</p>${cmd(run(`docker pull ${i.detail}`))}`;
+        <p>${place}</p>${cmd(`docker pull ${i.detail}`)}`;
     }
     html += `<h4>Optional: clean up old images</h4>
       <p>${place} Frees disk space taken by images no container uses anymore.</p>
-      ${cmd(run("docker image prune -f"))}`;
+      ${cmd("docker image prune -f")}`;
     return html;
   }
 

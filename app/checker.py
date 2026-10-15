@@ -197,6 +197,8 @@ class Checker:
                 item.update(status="error", note=_err(exc))
                 return [item] if node.check_lxc else []
         item, has_docker = self._apply_report_full(item, code, out, err)
+        ip = await session.lxc_ip(vmid)
+        item["ip"] = ip  # shown in the "how to update" instructions (ssh root@ip)
         items = [item] if node.check_lxc else []
 
         if node.check_docker_in_lxc and has_docker:
@@ -207,14 +209,15 @@ class Checker:
                     containers = await DockerCLISource(session.docker_runner(vmid)).list_containers()
                 link = node.dockhand_url
                 port = dockhand_port(containers)
-                if port:
-                    ip = await session.lxc_ip(vmid)
-                    if ip:
-                        link = f"http://{ip}:{port}"
-                        item["link"] = link  # this LXC runs its own Dockhand
-                items += await asyncio.gather(*(
+                if port and ip:
+                    link = f"http://{ip}:{port}"
+                    item["link"] = link  # this LXC runs its own Dockhand
+                docker_items = await asyncio.gather(*(
                     _docker_item(c, registry, group, source, id_prefix, link, vmid) for c in containers
                 ))
+                for d in docker_items:
+                    d.update(ip=ip, lxc_name=name)
+                items += docker_items
             except Exception as exc:
                 items.append(_item("docker", f"{id_prefix}:*", group, source, f"Docker in {name}", "",
                                    status="error", note=_err(exc)))

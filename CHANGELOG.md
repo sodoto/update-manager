@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.4.0 (2026-10-15)
+- Click the version number in the header to check GitHub for a new version right away.
+- Update instructions now run inside the container (its console or SSH, with its IP address)
+  instead of through the Proxmox Shell. Snapshots are taken from the Proxmox web UI.
+
 ## 1.3.0 (2026-10-15)
 - Update Manager tells you when a new version is out: a banner on the dashboard with "What's new".
 - "Update now" button updates Update Manager itself from the dashboard (LXC installs). It only updates

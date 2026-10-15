@@ -2,6 +2,27 @@
 const AppUpdate = (() => {
   let info = null;
   let updating = null;  // { from, started } while a self-update is in progress
+  let checking = false;
+
+  async function checkNow() {
+    checking = true;
+    const el = $("version");
+    el.innerHTML = `<span class="spin"></span> Checking…`;
+    let message;
+    try {
+      const a = await api("api/app/check", "POST", {});
+      message = a.error ? `⚠ ${a.error}` : a.update_available ? null : `✓ v${a.version} is the latest`;
+      checking = false;
+      render(a);
+    } catch (e) {
+      message = `⚠ ${e.message}`;
+    }
+    checking = false;
+    if (message) {
+      el.textContent = message;
+      setTimeout(() => render(info), 4000);
+    }
+  }
 
   const UPDATE_CMD = {
     lxc: "update-manager-update",
@@ -22,9 +43,10 @@ const AppUpdate = (() => {
         <div class="text"><b>Updating Update Manager…</b> This takes about a minute; the page reloads by itself.</div></div>`;
       return;
     }
-    $("version").innerHTML = a.update_available
-      ? `v${esc(a.version)} <button class="link" data-app="notes" title="A new version is available">→ v${esc(a.latest)}</button>`
-      : `v${esc(a.version)}`;
+    if (!checking) {
+      $("version").innerHTML = `<button class="link version-btn" data-app="check" title="Check for a new version">v${esc(a.version)}</button>`
+        + (a.update_available ? ` <button class="link" data-app="notes" title="A new version is available">→ v${esc(a.latest)}</button>` : "");
+    }
     if (!a.update_available) { el.innerHTML = ""; return; }
     el.innerHTML = `<div class="app-banner">
       <div class="text"><b>Update Manager v${esc(a.latest)} is available</b> <span class="hint">· you have v${esc(a.version)}</span></div>
@@ -93,8 +115,9 @@ const AppUpdate = (() => {
 
   document.addEventListener("click", (e) => {
     const b = e.target.closest("[data-app]");
-    if (!b || !info) return;
-    if (b.dataset.app === "notes") showNotes();
+    if (!b || !info || checking) return;
+    if (b.dataset.app === "check") checkNow();
+    else if (b.dataset.app === "notes") showNotes();
     else if (b.dataset.app === "howto") showHowto();
     else if (b.dataset.app === "update") start();
   });
