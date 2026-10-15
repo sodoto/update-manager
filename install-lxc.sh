@@ -47,6 +47,7 @@ Wants=network-online.target
 
 [Service]
 Environment=DATA_DIR=$DATA_DIR
+Environment=UM_INSTALL=lxc
 WorkingDirectory=$SRC_DIR
 ExecStart=$APP_DIR/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8080
 Restart=on-failure
@@ -65,8 +66,45 @@ exec bash "$SRC_DIR/install-lxc.sh"
 EOF
 chmod 755 /usr/local/bin/update-manager-update
 
+# Self-update from the dashboard: the app only drops a request file; this separate systemd unit
+# sees it and runs update-manager-update (the app can't update itself: the restart would cut it off).
+# Written to a temp file then moved: this script may be the one running the update right now.
+cat > /usr/local/bin/update-manager-selfupdate.tmp <<EOF
+#!/usr/bin/env bash
+rm -f "$DATA_DIR/self-update.request"
+{
+  echo "Started: \$(date -Is)"
+  /usr/local/bin/update-manager-update
+  echo "Exit code: \$?"
+} > "$DATA_DIR/self-update.log" 2>&1
+EOF
+chmod 755 /usr/local/bin/update-manager-selfupdate.tmp
+mv -f /usr/local/bin/update-manager-selfupdate.tmp /usr/local/bin/update-manager-selfupdate
+
+cat > /etc/systemd/system/update-manager-selfupdate.service <<EOF
+[Unit]
+Description=Update Manager self-update
+
+[Service]
+Type=oneshot
+TimeoutStartSec=15min
+ExecStart=/usr/local/bin/update-manager-selfupdate
+EOF
+
+cat > /etc/systemd/system/update-manager-selfupdate.path <<EOF
+[Unit]
+Description=Watch for Update Manager self-update requests
+
+[Path]
+PathExists=$DATA_DIR/self-update.request
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
 systemctl daemon-reload
 systemctl enable -q update-manager
+systemctl enable -q --now update-manager-selfupdate.path
 systemctl restart update-manager
 
 IP=$(hostname -I | awk '{print $1}')

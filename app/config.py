@@ -61,6 +61,8 @@ class Settings(_Model):
     check_on_start: bool = True
     refresh_package_lists: bool = True  # run apt-get update / apk update before checking
     concurrency: int = Field(default=4, ge=1, le=32)
+    check_app_updates: bool = True  # look on GitHub for new versions of Update Manager
+    allow_self_update: bool = True  # allow updating Update Manager from the dashboard (LXC install)
     ui_username: str | None = None
     ui_password: str | None = None
     docker_hosts: list[DockerHost] = Field(default_factory=list)

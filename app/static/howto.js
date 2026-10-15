@@ -93,12 +93,16 @@ const HowTo = (() => {
     return html;
   }
 
+  function show(html) {
+    $("modalBody").innerHTML = html;
+    $("modal").hidden = false;
+    $("modalClose").focus();
+  }
+
   function open(item) {
     if (!item) return;
     const body = item.kind === "lxc" ? lxc(item) : item.kind === "host" ? host(item) : docker(item);
-    $("modalBody").innerHTML = body + `<p class="hint" style="margin-top:16px">When you're done, click <b>Check now</b> to refresh the dashboard.</p>`;
-    $("modal").hidden = false;
-    $("modalClose").focus();
+    show(body + `<p class="hint" style="margin-top:16px">When you're done, click <b>Check now</b> to refresh the dashboard.</p>`);
   }
 
   function close() { $("modal").hidden = true; }
@@ -115,5 +119,5 @@ const HowTo = (() => {
   });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("modal").hidden) close(); });
 
-  return { open };
+  return { open, show, close };
 })();

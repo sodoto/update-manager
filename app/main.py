@@ -19,6 +19,7 @@ from .docker_sources import DockerAPISource
 from .keys import ensure_app_key, public_key, setup_script
 from .notify import send_test
 from .proxmox import GATEWAY_VERSION, ProxmoxSession
+from .selfupdate import CURRENT as APP_VERSION, AppUpdates
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("update-manager")
@@ -26,10 +27,10 @@ for noisy in ("asyncssh", "httpx"):
     logging.getLogger(noisy).setLevel(logging.WARNING)
 
 STATIC = Path(__file__).parent / "static"
-VERSION_FILE = Path(__file__).parent.parent / "VERSION"
-APP_VERSION = VERSION_FILE.read_text(encoding="utf-8").strip() if VERSION_FILE.exists() else "dev"
 MASK = "********"
+APP_CHECK_INTERVAL = 6 * 3600
 checker = Checker(load_settings())
+app_updates = AppUpdates()
 _background: set[asyncio.Task] = set()
 _scheduler_task: asyncio.Task | None = None
 
@@ -57,6 +58,13 @@ async def _scheduler(run_now: bool) -> None:
         _spawn(_safe_check())
 
 
+async def _app_update_loop() -> None:
+    while True:
+        if checker.settings.check_app_updates:
+            await app_updates.check()
+        await asyncio.sleep(APP_CHECK_INTERVAL)
+
+
 def _start_scheduler(run_now: bool) -> None:
     global _scheduler_task
     if _scheduler_task:
@@ -70,6 +78,7 @@ async def lifespan(_: FastAPI):
     if not CONFIG_PATH.exists():
         log.warning("No config at %s yet - open the Settings page to configure", CONFIG_PATH)
     _start_scheduler(checker.settings.check_on_start)
+    _spawn(_app_update_loop())
     yield
     if _scheduler_task:
         _scheduler_task.cancel()
@@ -159,7 +168,30 @@ async def index():
 
 @app.get("/api/state", dependencies=[Depends(require_auth)])
 async def state():
-    return {**checker.public_state(), "version": APP_VERSION}
+    return {**checker.public_state(), "version": APP_VERSION,
+            "app": app_updates.public(checker.settings.allow_self_update)}
+
+
+@app.post("/api/app/check", dependencies=[Depends(require_auth)])
+async def check_app_version(_: dict = Depends(json_body)):
+    await app_updates.check()
+    return app_updates.public(checker.settings.allow_self_update)
+
+
+@app.post("/api/app/update", status_code=202, dependencies=[Depends(require_auth)])
+async def self_update(_: dict = Depends(json_body)):
+    info = app_updates.public(checker.settings.allow_self_update)
+    if info["install"] != "lxc":
+        raise HTTPException(400, "Self-update only works for LXC installs made with install-lxc.sh")
+    if not checker.settings.allow_self_update:
+        raise HTTPException(403, "Self-update is turned off in Settings")
+    app_updates.request_update()
+    return {"started": True, "from_version": APP_VERSION}
+
+
+@app.get("/api/app/update-log", dependencies=[Depends(require_auth)])
+async def self_update_log():
+    return {"log": app_updates.log_tail()}
 
 
 @app.post("/api/check", status_code=202, dependencies=[Depends(require_auth)])

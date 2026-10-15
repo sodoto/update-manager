@@ -32,11 +32,11 @@ The gateway script is [app/gateway/update-manager-ro.sh](app/gateway/update-mana
    ```
 3. Open `http://<lxc-ip>:8080` and go to **Settings**.
 
-**Update to the latest version** (your settings are kept):
+**Updating Update Manager:** when a new version is published, the dashboard shows a banner. Click **Update now** and the page reloads on the new version a minute later. Your settings are kept. Or run this in the LXC:
 ```bash
 update-manager-update
 ```
-The installed version is shown at the top of the dashboard.
+The installed version is shown at the top of the dashboard. **Update now** only updates this app: the dashboard drops a request file, and a separate systemd unit (`update-manager-selfupdate.path`) runs `update-manager-update`. You can turn it off in Settings.
 
 ## Install with Docker
 

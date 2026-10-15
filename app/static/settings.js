@@ -59,6 +59,20 @@ const Settings = (() => {
       </section>
 
       <section class="panel">
+        <h2>Update Manager updates</h2>
+        <p class="help">New versions of this app are published on GitHub.</p>
+        <div class="checks">
+          ${checkbox("Check GitHub for new versions", "check_app_updates", "Every 6 hours. Shows a banner on the dashboard when one is available.")}
+          ${checkbox("Allow updating Update Manager from the dashboard", "allow_self_update",
+            "Adds an <b>Update now</b> button (LXC installs only). It only updates this app, never your containers or Proxmox.")}
+        </div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px">
+          <button class="small" data-action="check-app">Check for updates now</button>
+          <span class="help" style="margin:0" id="appVersionInfo"></span>
+        </div>
+      </section>
+
+      <section class="panel">
         <h2>Proxmox nodes</h2>
         <p class="help">Every running LXC on these nodes is checked, plus the node itself. Docker inside an LXC is detected automatically.
           Access is <b>read-only</b>: the app's SSH key can only run a small gateway script that allows reading, never changing.</p>
@@ -165,6 +179,20 @@ const Settings = (() => {
         <p class="help" style="margin-top:10px">Settings are stored in <code>${esc(meta.config_path)}</code>.</p>
       </section>`;
     updateSavebar();
+    showAppVersion();
+  }
+
+  async function showAppVersion(fresh) {
+    try {
+      const a = fresh || (await api("api/state")).app;
+      const el = $("appVersionInfo");
+      if (!el) return;
+      el.innerHTML = a.error ? `You have v${esc(a.version)}. ${esc(a.error)}`
+        : a.update_available ? `You have v${esc(a.version)}. <b>v${esc(a.latest)} is available</b>, see the dashboard banner.`
+        : a.latest ? `You have v${esc(a.version)}, the latest version. Checked ${ago(a.checked_at)}.`
+        : `You have v${esc(a.version)}.`;
+      if (fresh) AppUpdate.render(fresh);
+    } catch { /* not critical */ }
   }
 
   function updateSavebar(message, cls = "") {
@@ -263,6 +291,13 @@ const Settings = (() => {
         break;
       case "test-docker":
         await runTest(`docker_hosts.${i}`, "api/test/docker", data.docker_hosts[i]);
+        break;
+      case "check-app":
+        btn.disabled = true;
+        $("appVersionInfo").innerHTML = `<span class="spin"></span>`;
+        try { await showAppVersion(await api("api/app/check", "POST", {})); }
+        catch (e) { $("appVersionInfo").textContent = e.message; }
+        btn.disabled = false;
         break;
       case "test-notify":
         await runTest("notify", "api/test/notify", data.notify);

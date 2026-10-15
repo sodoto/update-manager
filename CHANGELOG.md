@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.3.0 (2026-10-15)
+- Update Manager tells you when a new version is out: a banner on the dashboard with "What's new".
+- "Update now" button updates Update Manager itself from the dashboard (LXC installs). It only updates
+  this app, never your containers or Proxmox. Can be turned off in Settings.
+
 ## 1.2.0 (2026-10-15)
 - "How to update" button (i) on every item with updates: step-by-step instructions with copyable commands
   for LXCs (snapshot, upgrade, restart), the Proxmox host, and Docker containers (Dockhand or docker compose).

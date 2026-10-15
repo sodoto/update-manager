@@ -19,7 +19,7 @@ const Dashboard = (() => {
     clearTimeout(timer);
     try {
       state = await api("api/state");
-      $("version").textContent = `v${state.version}`;
+      AppUpdate.render(state.app);
       render();
     } catch (e) {
       $("meta").textContent = `Cannot reach server (${e.message})`;

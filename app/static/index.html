@@ -11,7 +11,7 @@
 <div class="wrap">
   <header>
     <h1>Update Manager</h1>
-    <span class="ro-pill" title="This app can only read and check. It cannot install or change anything.">Read-only</span>
+    <span class="ro-pill" title="Update Manager only reads and checks. It never changes your Proxmox host, containers or Docker.">Read-only</span>
     <nav>
       <a href="#" id="navDashboard">Dashboard</a>
       <a href="#settings" id="navSettings">Settings</a>
@@ -21,6 +21,8 @@
     <span class="meta" id="version"></span>
     <button class="primary" id="checkBtn">Check now</button>
   </header>
+
+  <div id="appBanner"></div>
 
   <main id="dashboardView">
     <div class="cards" id="cards"></div>
@@ -58,6 +60,7 @@
 
 <script src="static/common.js"></script>
 <script src="static/howto.js"></script>
+<script src="static/appupdate.js"></script>
 <script src="static/dashboard.js"></script>
 <script src="static/settings.js"></script>
 </body>
