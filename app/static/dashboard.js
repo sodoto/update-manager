@@ -152,7 +152,11 @@ const Dashboard = (() => {
             `<tr><td><a href="https://github.com/${esc(a.repo)}/releases" target="_blank" rel="noopener">${esc(a.name)}</a></td>
              <td>${esc(a.current)}</td><td>${esc(a.latest)}${a.pinned ? ' <span class="hint" title="Version tested by the script maintainers">(tested)</span>' : ""}</td>
              <td>${a.update ? '<span class="badge update_available">update</span>' : '<span class="badge up_to_date">up to date</span>'}</td></tr>`).join("")}</table>`
-        : `<p class="hint">${esc(i.app_note || "No app version recorded in this container.")}</p>`;
+        : (i.app_self || []).length
+          ? i.app_self.map(a => `<p><b>${esc(a.name)}</b> updates itself: the community script's <code>update</code> only updates the OS packages.
+              Check for updates in ${esc(a.name)}'s own web interface.${a.latest ? ` Latest release:
+              <a href="https://github.com/${esc(a.repo)}/releases" target="_blank" rel="noopener">${esc(a.latest)}</a>.` : ""}</p>`).join("")
+          : `<p class="hint">${esc(i.app_note || "No app version recorded in this container.")}</p>`;
       if ((i.app_updates || []).length && i.app_note) html += `<p class="hint">${esc(i.app_note)}</p>`;
       if (i.packages.length) html += `<p style="margin-top:10px"><b>OS packages</b></p>`;
     }

@@ -13,12 +13,25 @@ import time
 import httpx
 
 SCRIPT_URL = "https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/ct/{slug}.sh"
+INSTALL_URL = "https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/install/{slug}-install.sh"
 CACHE_SECONDS = 6 * 3600
 
 CHECK_RE = re.compile(r'check_for_gh_release\s+"([^"]+)"\s+"([^"]+)"((?:\s+"[^"]*")*)')
 ARG_RE = re.compile(r'"([^"]*)"')
 LEGACY_REPO_RE = re.compile(r"api\.github\.com/repos/([\w.-]+/[\w.-]+)/releases/latest")
 APP_RE = re.compile(r'^APP="([^"]+)"', re.M)
+DEPLOY_RE = re.compile(r'fetch_and_deploy_gh_release\s+"([^"]+)"\s+"([^"]+)"')
+UPDATE_FN_RE = re.compile(r"function update_script\(\)\s*\{(.*?)\n\}", re.S)
+BOILERPLATE = {"header_info", "check_container_storage", "check_container_resources", "run_os_update", "exit"}
+
+
+def _os_only_update(script: str) -> bool:
+    """True when the script's update only runs the OS update (the app is left alone)."""
+    body = UPDATE_FN_RE.search(script)
+    if not body:
+        return False
+    lines = [l.strip() for l in body.group(1).splitlines() if l.strip() and not l.strip().startswith("#")]
+    return "run_os_update" in lines and all(l in BOILERPLATE for l in lines)
 
 
 def _clean(version: str) -> str:
@@ -43,12 +56,12 @@ class CommunityScripts:
         self._cache[key] = (time.time(), value)
         return value
 
-    async def _script(self, slug: str) -> str | None:
+    async def _script(self, slug: str, url: str = SCRIPT_URL) -> str | None:
         async def fetch():
             async with httpx.AsyncClient(timeout=20) as client:
-                resp = await client.get(SCRIPT_URL.format(slug=slug))
+                resp = await client.get(url.format(slug=slug))
             return resp.text if resp.status_code == 200 else None
-        return await self._cached(f"script:{slug}", fetch)
+        return await self._cached(f"script:{url}:{slug}", fetch)
 
     async def _latest(self, repo: str, token: str | None) -> str:
         async def fetch():
@@ -68,11 +81,16 @@ class CommunityScripts:
             self._cache.pop(f"release:{repo}", None)  # don't cache failures
             raise
 
-    async def check(self, slug: str, versions: dict[str, str], token: str | None) -> tuple[list[dict], str]:
-        """Returns (components, note). Each component: name, repo, current, latest, update."""
+    async def check(self, slug: str, versions: dict[str, str], token: str | None) -> tuple[list[dict], str, list[dict]]:
+        """Returns (components, note, self_updating).
+
+        components: apps the script's `update` updates; each has name, repo, current, latest, update.
+        self_updating: apps the script installed from GitHub but never updates (they update themselves,
+        e.g. AdGuard Home from its web interface); each has name, repo, latest.
+        """
         script = await self._script(slug)
         if not script:
-            return [], f"community script ct/{slug}.sh not found"
+            return [], f"community script ct/{slug}.sh not found", []
 
         wanted = []  # (name, repo, version file keys, pinned)
         for name, repo, rest in CHECK_RE.findall(script):
@@ -92,7 +110,9 @@ class CommunityScripts:
             if repo and app:
                 wanted.append((app.group(1), repo.group(1), [f"{app.group(1)}_version.txt"], ""))
         if not wanted:
-            return [], "this app is updated through the OS packages"
+            if _os_only_update(script):
+                return [], "", await self._self_updating(slug, token)
+            return [], "this app is updated through the OS packages (or its own package repository)", []
 
         # check_for_gh_release migrates /opt/*_version.txt to ~/.<app>: use it when that file doesn't exist yet.
         legacy = next((v for k, v in versions.items() if k.endswith("_version.txt")), None)
@@ -111,4 +131,16 @@ class CommunityScripts:
             current = _clean(current)
             components.append({"name": name, "repo": repo, "current": current, "latest": latest,
                                "update": bool(latest) and current != latest, "pinned": bool(pinned)})
-        return components, "; ".join(dict.fromkeys(errors))
+        return components, "; ".join(dict.fromkeys(errors)), []
+
+    async def _self_updating(self, slug: str, token: str | None) -> list[dict]:
+        """Apps the install script downloaded from GitHub, which the script's `update` doesn't touch."""
+        install = await self._script(slug, INSTALL_URL) or ""
+        apps = []
+        for name, repo in dict.fromkeys(DEPLOY_RE.findall(install)):
+            try:
+                latest = await self._latest(repo, token)
+            except Exception:
+                latest = ""
+            apps.append({"name": name, "repo": repo, "latest": latest})
+        return apps

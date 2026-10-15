@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.9.1 (2026-10-15)
+- Community scripts: apps that update themselves (e.g. AdGuard Home) were wrongly described as "updated
+  through the OS packages". Their script's `update` only updates the OS; the app is now shown as updating
+  itself (from its own web interface), with the latest release for comparison.
+
 ## 1.9.0 (2026-10-15)
 - Community scripts: LXCs created with the Proxmox VE community scripts are detected ("Helper script" badge),
   and their app version is compared with the latest GitHub release, like the script's own `update` does

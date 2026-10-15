@@ -318,12 +318,13 @@ class Checker:
         """Community-script LXC: compare the app version it recorded with the latest release."""
         item["community_script"] = report.community_script
         try:
-            apps, note = await self.community.check(report.community_script, report.app_versions,
-                                                    self.settings.github_token)
+            apps, note, self_updating = await self.community.check(
+                report.community_script, report.app_versions, self.settings.github_token)
         except Exception as exc:
-            apps, note = [], f"app version check failed: {_err(exc)}"
+            apps, note, self_updating = [], f"app version check failed: {_err(exc)}", []
         item["app_updates"] = apps
         item["app_note"] = note
+        item["app_self"] = self_updating
         if any(a["update"] for a in apps) and item["status"] == "up_to_date":
             item["status"] = "update_available"
 

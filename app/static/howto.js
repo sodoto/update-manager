@@ -39,7 +39,13 @@ const HowTo = (() => {
       ${access(id)}
 
       <h4>3. Install the updates</h4>`;
-    if (i.community_script) {
+    const selfUpdating = i.app_self || [];
+    if (i.community_script && selfUpdating.length) {
+      html += `<p>${where(`Inside ${i.name}`)} This container was created with a community script. Its <code>update</code> command
+        only updates the OS packages:</p>${cmd(up || "update")}
+        <div class="note">${selfUpdating.map(a => `<b>${esc(a.name)}</b> is not updated by the script: it updates itself.
+          Open its web interface to check for and install new versions${a.latest ? ` (latest release: ${esc(a.latest)})` : ""}.`).join("<br>")}</div>`;
+    } else if (i.community_script) {
       html += `<p>${where(`Inside ${i.name}`)} This container was created with a community script. Its <code>update</code> command
         updates the app${apps.length ? ` (${esc(apps.map(a => a.latest).join(", "))})` : ""} and the OS packages:</p>${cmd("update")}
         <p class="hint">It may ask questions: answer them in the console.</p>`;
