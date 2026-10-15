@@ -95,8 +95,15 @@ const HowTo = (() => {
       ${inLxc ? access(i.vmid) : `<p>Open a shell on <b>${esc(i.source)}</b>.</p>`}`;
     if (i.compose_dir) {
       const svc = i.compose_service ? ` ${i.compose_service}` : "";
+      const members = Dashboard.stack(i);
       html += `<p>${place} This container belongs to the Compose project in <code>${esc(i.compose_dir)}</code>:</p>
-        ${cmd(`cd ${arg(i.compose_dir)} && docker compose pull${svc} && docker compose up -d${svc}`)}
+        ${cmd(`cd ${arg(i.compose_dir)} && docker compose pull${svc} && docker compose up -d${svc}`)}`;
+      if (members.length > 1) {
+        html += `<p>To update the <b>whole ${esc(i.compose_project)} stack</b> (${members.length} containers) at once,
+          which apps like Immich need so all their parts stay on the same version:</p>
+          ${cmd(`cd ${arg(i.compose_dir)} && docker compose pull && docker compose up -d`)}`;
+      }
+      html += `
         <p class="hint">If Dockhand created this stack, the folder may only exist inside Dockhand. If the command says
           "no such file or directory", use option A.</p>`;
     } else {

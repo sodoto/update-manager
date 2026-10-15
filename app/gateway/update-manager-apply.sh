@@ -11,8 +11,10 @@
 #   reboot-lxc <vmid>                  restart an LXC
 #   compose-update <vmid> <container>  pull + recreate one Docker Compose service inside an LXC; the folder and
 #                                      service come from the container's own labels, never from the caller
+#   compose-update-stack <vmid> <container>
+#                                      same, for every service of that container's Compose project (the stack)
 set -u
-VERSION=2
+VERSION=3
 
 read -r -d '' UPGRADE <<'EOF'
 # um-upgrade
@@ -39,6 +41,7 @@ read -r -d '' COMPOSE <<'EOF'
 # um-compose-update
 set -f
 cid="$1"
+mode="${2:-service}"  # service: only this container's service | stack: the whole Compose project
 label() {
   v=$(docker inspect -f "{{ index .Config.Labels \"$1\" }}" "$cid" 2>/dev/null) || return 1
   [ "$v" = "<no value>" ] && v=""
@@ -64,11 +67,12 @@ set -- -p "$proj"
 old_ifs=$IFS; IFS=,
 for f in $files; do [ -f "$f" ] && set -- "$@" -f "$f"; done
 IFS=$old_ifs
+if [ "$mode" = stack ]; then svc=""; fi  # no service name: the whole project
 echo "+ cd $dir"
 echo "+ $dc $* pull $svc"
-$dc "$@" pull "$svc" || exit $?
+$dc "$@" pull $svc || exit $?
 echo "+ $dc $* up -d $svc"
-$dc "$@" up -d "$svc"
+$dc "$@" up -d $svc
 EOF
 
 CMD="${SSH_ORIGINAL_COMMAND:-}"
@@ -105,7 +109,13 @@ case "${ARGS[0]:-}" in
     need_vmid
     [[ "${ARGS[2]}" =~ ^[0-9a-f]{12,64}$ ]] || deny
     logger -t update-manager-apply "compose-update $VMID ${ARGS[2]}" 2>/dev/null
-    exec pct exec "$VMID" -- sh -c "$COMPOSE" sh "${ARGS[2]}" ;;
+    exec pct exec "$VMID" -- sh -c "$COMPOSE" sh "${ARGS[2]}" service ;;
+  compose-update-stack)
+    [ "$N" -eq 3 ] || deny
+    need_vmid
+    [[ "${ARGS[2]}" =~ ^[0-9a-f]{12,64}$ ]] || deny
+    logger -t update-manager-apply "compose-update-stack $VMID ${ARGS[2]}" 2>/dev/null
+    exec pct exec "$VMID" -- sh -c "$COMPOSE" sh "${ARGS[2]}" stack ;;
   *)
     deny ;;
 esac

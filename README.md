@@ -26,10 +26,11 @@ The gateway script is [app/gateway/update-manager-ro.sh](app/gateway/update-mana
 
 Off by default. When enabled (**Settings → Run updates from the app**), rows with updates get an **Update** button that shows the live output and re-checks the row when done.
 
-- It uses a **second SSH key**, installed with its own setup block. It is locked to [app/gateway/update-manager-apply.sh](app/gateway/update-manager-apply.sh), which allows only three actions:
+- It uses a **second SSH key**, installed with its own setup block. It is locked to [app/gateway/update-manager-apply.sh](app/gateway/update-manager-apply.sh), which allows only these actions:
   - install package updates inside an LXC (non-interactive, your config files are kept);
   - restart an LXC;
   - update one Docker Compose service inside an LXC (`docker compose pull` + `up -d`). The folder and service are read from the container's own labels on the node, never taken from the app.
+  - update a whole Docker Compose stack inside an LXC (same, for every service of the project).
 - The Proxmox host itself is never updated by the app, and containers not started with Docker Compose are left to Dockhand.
 - Checks keep using the read-only key.
 - It requires a dashboard login, so nobody on your network can install updates without the password.

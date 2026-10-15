@@ -4,6 +4,7 @@ Only three actions exist, matching gateway/update-manager-apply.sh:
   upgrade         install package updates in an LXC
   reboot          restart an LXC
   compose-update  pull + recreate one Docker Compose service inside an LXC
+  compose-update-stack  same for every service of that container's Compose project
 """
 import asyncio
 import itertools
@@ -31,22 +32,32 @@ def can_apply(item: dict, action: str) -> bool:
     if action in ("upgrade", "reboot"):
         return item["kind"] == "lxc" and item.get("vmid") is not None and (
             action == "reboot" or (item.get("manager") in MANAGERS and item.get("update_count", 0) > 0))
-    if action == "compose-update":
+    if action in ("compose-update", "compose-update-stack"):
         return (item["kind"] == "docker" and item.get("vmid") is not None
-                and bool(item.get("compose_dir")) and bool(item.get("container_id")))
+                and bool(item.get("compose_dir")) and bool(item.get("container_id"))
+                and (action == "compose-update" or bool(item.get("compose_project"))))
     return False
+
+
+def stack_members(items: list[dict], item: dict) -> list[dict]:
+    """The Docker containers of the same Compose project, in the same LXC."""
+    return [i for i in items if i["kind"] == "docker" and i.get("vmid") == item.get("vmid")
+            and i.get("group") == item.get("group") and i.get("compose_project") == item.get("compose_project")]
 
 
 class Job:
     _ids = itertools.count(1)
 
-    def __init__(self, item: dict, action: str):
+    def __init__(self, item: dict, action: str, item_ids: list[str] | None = None):
         self.id = str(next(self._ids))
         self.item_id = item["id"]
+        self.item_ids = item_ids or [item["id"]]  # every row this job changes (all containers of a stack)
         self.action = action
-        verb = {"upgrade": "Installing updates on", "reboot": "Restarting", "compose-update": "Updating"}[action]
+        verb = {"upgrade": "Installing updates on", "reboot": "Restarting", "compose-update": "Updating",
+                "compose-update-stack": "Updating stack"}[action]
+        name = item.get("compose_project") if action == "compose-update-stack" else item["name"]
         where = f"CT {item['vmid']}" if item["kind"] == "lxc" else item.get("lxc_name") or f"CT {item['vmid']}"
-        self.title = f"{verb} {item['name']} ({where})"
+        self.title = f"{verb} {name} ({where})"
         self.status = "running"  # running | succeeded | failed
         self.exit_code: int | None = None
         self.started = _now()
@@ -61,7 +72,7 @@ class Job:
             del self.lines[: len(self.lines) - MAX_LINES]
 
     def summary(self) -> dict:
-        return {"id": self.id, "item_id": self.item_id, "action": self.action, "title": self.title,
+        return {"id": self.id, "item_id": self.item_id, "item_ids": self.item_ids, "action": self.action, "title": self.title,
                 "status": self.status, "exit_code": self.exit_code, "started": self.started,
                 "finished": self.finished, "rechecked": self.rechecked, "done": self.done}
 
@@ -76,7 +87,7 @@ class JobRunner:
         self._tasks: set[asyncio.Task] = set()
 
     def running_for(self, item_id: str) -> Job | None:
-        return next((j for j in self.jobs.values() if j.item_id == item_id and j.status == "running"), None)
+        return next((j for j in self.jobs.values() if item_id in j.item_ids and j.status == "running"), None)
 
     def summaries(self) -> list[dict]:
         return [j.summary() for j in self.jobs.values()]
@@ -84,7 +95,8 @@ class JobRunner:
     def start(self, item: dict, action: str) -> Job:
         if not can_apply(item, action):
             raise ValueError("this action is not available for this item")
-        if self.running_for(item["id"]):
+        members = stack_members(self.checker.state["items"], item) if action == "compose-update-stack" else [item]
+        if any(self.running_for(m["id"]) for m in members):
             raise JobBusy("an update is already running for this item")
         if self.checker.running:
             raise JobBusy("a full check is running, try again when it finishes")
@@ -93,7 +105,7 @@ class JobRunner:
         if not node:
             raise ValueError("this Proxmox node is no longer configured")
 
-        job = Job(item, action)
+        job = Job(item, action, [m["id"] for m in members])
         self.jobs[job.id] = job
         for old in list(self.jobs)[:-KEEP_JOBS]:
             if self.jobs[old].status != "running":
@@ -101,23 +113,29 @@ class JobRunner:
 
         vmid = int(item["vmid"])
         if action == "upgrade":
-            args, recheck = ("upgrade-lxc", vmid), item["id"]
+            args = ("upgrade-lxc", vmid)
         elif action == "reboot":
-            args, recheck = ("reboot-lxc", vmid), item["id"]
+            args = ("reboot-lxc", vmid)
+        elif action == "compose-update-stack":
+            args = ("compose-update-stack", vmid, item["container_id"])
         else:
-            args, recheck = ("compose-update", vmid, item["container_id"]), item["id"]
+            args = ("compose-update", vmid, item["container_id"])
+        recheck = job.item_ids
         task = asyncio.create_task(self._run(job, node, args, recheck))
         self._tasks.add(task)
         task.add_done_callback(self._tasks.discard)
         log.info("Job %s started: %s", job.id, job.title)
         return job
 
-    async def _run(self, job: Job, node, args: tuple, recheck_id: str) -> None:
+    async def _run(self, job: Job, node, args: tuple, recheck_ids: list[str]) -> None:
         try:
             async with UpdateSession(node) as session:
                 version = await session.apply_version()
                 if version is None:
                     raise RuntimeError(UpdateSession.not_authorized)
+                if args[0] == "compose-update-stack" and version < 3:
+                    raise RuntimeError(f"Update stack needs update gateway v3 (this node has v{version}): "
+                                       "paste the update setup block from Settings on this node again")
                 if version < APPLY_VERSION:
                     job.add(f"Note: this node has update gateway v{version}; output may only appear at the end. "
                             "Paste the update setup block from Settings on this node again for live output.")
@@ -133,12 +151,15 @@ class JobRunner:
         job.finished = _now()
         log.info("Job %s %s: %s", job.id, job.status, job.title)
 
-        # Refresh the row so the dashboard reflects the result.
+        # Refresh the rows so the dashboard reflects the result.
         if job.action == "reboot":
             await asyncio.sleep(15)  # let the container boot
-        try:
-            await self.checker.check_item(recheck_id)
-            job.rechecked = True
-        except Exception as exc:
-            log.warning("Re-check after job %s failed: %s", job.id, exc)
+        ok = True
+        for item_id in recheck_ids:
+            try:
+                await self.checker.check_item(item_id)
+            except Exception as exc:
+                ok = False
+                log.warning("Re-check of %s after job %s failed: %s", item_id, job.id, exc)
+        job.rechecked = ok
         job.done = True

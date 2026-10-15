@@ -90,8 +90,45 @@ const Dashboard = (() => {
       return `<section class="group ${folded ? "collapsed" : ""}">
         <h2 data-group="${esc(src)}" role="button" tabindex="0" aria-expanded="${!folded}"><span class="chev">▾</span>${esc(src)}
           <span class="count">· ${list.length} item${list.length === 1 ? "" : "s"}${upd ? ` · ${upd} to update` : ""}</span></h2>
-        ${folded ? "" : list.map(row).join("")}</section>`;
+        ${folded ? "" : rows(list)}</section>`;
     }).join("");
+  }
+
+  const jobFor = (id) => (state.jobs || []).find(j => (j.item_ids || [j.item_id]).includes(id) && !j.done);
+
+  // Docker containers of the same Compose project in the same place (all of them, not only the filtered ones).
+  function stack(i) {
+    if (i.kind !== "docker" || !i.compose_project) return [i];
+    return state.items.filter(o => o.kind === "docker" && o.group === i.group && o.source === i.source
+      && o.vmid === i.vmid && o.compose_project === i.compose_project);
+  }
+
+  // Rows of a group: stand-alone items first, then each Compose stack (2+ containers) under its own header.
+  function rows(list) {
+    const stacks = {};
+    const single = [];
+    for (const i of list) {
+      if (i.kind === "docker" && i.compose_project && stack(i).length > 1) (stacks[i.compose_project] ??= []).push(i);
+      else single.push(i);
+    }
+    const order = Object.keys(stacks).sort((a, b) =>
+      (stack(stacks[b][0]).some(i => i.status === "update_available") - stack(stacks[a][0]).some(i => i.status === "update_available"))
+      || a.localeCompare(b));
+    return single.map(row).join("") + order.map(name => stackHeader(stacks[name][0]) +
+      `<div class="stack">${stacks[name].map(row).join("")}</div>`).join("");
+  }
+
+  function stackHeader(first) {
+    const members = stack(first);
+    const upd = members.filter(i => i.status === "update_available").length;
+    const busy = members.map(i => jobFor(i.id)).find(Boolean);
+    let action = "";
+    if (busy) action = `<button class="small" data-job-view="${esc(busy.id)}"><span class="spin"></span> Updating…</button>`;
+    else if (state.allow_updates && upd && Jobs.canApply(first, "compose-update-stack"))
+      action = `<button class="primary small" data-apply-stack="${esc(first.id)}">Update stack</button>`;
+    return `<div class="stack-head"><span class="stack-name">${esc(first.compose_project)}</span>
+      <span class="count">stack · ${members.length} containers${upd ? ` · ${upd} to update` : ""}</span>
+      <span class="spacer"></span>${action}</div>`;
   }
 
   function row(i) {
@@ -113,7 +150,7 @@ const Dashboard = (() => {
     buttons.push(`<button class="icon-btn" data-recheck="${esc(i.id)}" ${busy || state.running ? "disabled" : ""}
       title="${i.kind === "lxc" ? "Check this container again (and its Docker containers)" : "Check this again"}"
       aria-label="Check ${esc(i.name)} again">${busy ? '<span class="spin"></span>' : "↻"}</button>`);
-    const job = (state.jobs || []).find(j => j.item_id === i.id && !j.done);
+    const job = jobFor(i.id);
     if (job) buttons.push(`<button class="small" data-job-view="${esc(job.id)}"><span class="spin"></span> Updating…</button>`);
     else if (state.allow_updates && i.status === "update_available" && Jobs.canApply(i))
       buttons.push(`<button class="primary" data-apply="${esc(i.id)}">Update</button>`);
@@ -218,5 +255,5 @@ const Dashboard = (() => {
   $("kind").addEventListener("change", () => state && render());
   $("checkBtn").addEventListener("click", checkNow);
 
-  return { load, item: (id) => state && state.items.find(i => i.id === id) };
+  return { load, item: (id) => state && state.items.find(i => i.id === id), stack };
 })();

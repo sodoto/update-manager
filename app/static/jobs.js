@@ -8,6 +8,8 @@ const Jobs = (() => {
     if (action === "upgrade") return i.kind === "lxc" && i.vmid != null && MANAGERS.includes(i.manager) && i.update_count > 0;
     if (action === "reboot") return i.kind === "lxc" && i.vmid != null;
     if (action === "compose-update") return i.kind === "docker" && i.vmid != null && !!i.compose_dir && !!i.container_id;
+    if (action === "compose-update-stack")
+      return i.kind === "docker" && i.vmid != null && !!i.compose_dir && !!i.container_id && !!i.compose_project;
     return false;
   }
 
@@ -25,6 +27,14 @@ const Jobs = (() => {
       { label: "Update Manager asks Proxmox:", cmd: `reboot-lxc ${i.vmid}` },
       { label: "Proxmox runs:", cmd: `pct reboot ${i.vmid}` },
     ];
+    if (action === "compose-update-stack") {
+      const p = ` -p ${i.compose_project}`;
+      return [
+        { label: "Update Manager asks Proxmox:", cmd: `compose-update-stack ${i.vmid} ${i.container_id.slice(0, 12)}` },
+        { label: `Proxmox runs inside ${i.lxc_name || `CT ${i.vmid}`}:`,
+          cmd: `cd ${i.compose_dir}\ndocker compose${p} pull\ndocker compose${p} up -d` },
+      ];
+    }
     if (action === "compose-update") {
       const p = i.compose_project ? ` -p ${i.compose_project}` : "";
       const svc = i.compose_service || "";
@@ -45,6 +55,17 @@ const Jobs = (() => {
       title: `Restart ${i.name}?`, ok: "Restart", danger: true,
       message: `CT ${i.vmid} will restart now. Its services will be unavailable for a moment.`,
     };
+    if (action === "compose-update-stack") {
+      const members = Dashboard.stack(i);
+      const state = (m) => m.status === "update_available" ? "new image"
+        : m.status === "skipped" ? `skipped${m.note ? ` (${m.note})` : ""}` : m.status === "error" ? "error" : "up to date";
+      return {
+        title: `Update the ${i.compose_project} stack?`, ok: "Update stack",
+        message: `Pulls the images of all ${members.length} containers of the stack and recreates the ones that changed:\n`
+          + members.map(m => `• ${m.name}: ${state(m)}`).join("\n")
+          + `\n\nData in volumes is kept. Check the app's release notes for breaking changes first.`,
+      };
+    }
     if (action === "compose-update") return {
       title: `Update ${i.name}?`, ok: "Update",
       message: `Pulls the new image for ${i.detail} and recreates the container `
@@ -120,6 +141,8 @@ const Jobs = (() => {
     if (r) { const item = Dashboard.item(r.dataset.jobReboot); if (item) start(item, "reboot"); return; }
     const v = e.target.closest("[data-job-view]");
     if (v) { view(v.dataset.jobView); return; }
+    const st = e.target.closest("[data-apply-stack]");
+    if (st) { const item = Dashboard.item(st.dataset.applyStack); if (item) start(item, "compose-update-stack"); return; }
     const a = e.target.closest("[data-apply]");
     if (a) { const item = Dashboard.item(a.dataset.apply); if (item) start(item); }
   });

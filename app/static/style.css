@@ -125,6 +125,14 @@ button.danger-fill:hover { filter: brightness(1.1); background: var(--red); }
 .row { display: grid; grid-template-columns: 14px minmax(0, 1.2fr) minmax(0, 1.6fr) auto; gap: 12px; align-items: center;
   padding: 10px 16px; border-top: 1px solid var(--border); }
 .group .row:first-of-type { border-top: 0; }
+.stack-head { display: flex; gap: 8px; align-items: center; padding: 8px 16px; border-top: 1px solid var(--border);
+  background: var(--panel-2); font-size: 13px; }
+.stack-head .stack-name { font-weight: 600; }
+.stack-head .stack-name::before { content: "▤ "; color: var(--muted); }
+.stack-head .count { color: var(--muted); }
+.stack-head .spacer { flex: 1; }
+.stack-head button { padding: 4px 10px; font-size: 13px; }
+.stack { border-left: 3px solid var(--blue-bg); }
 .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--gray); }
 .dot.update_available { background: var(--amber); } .dot.up_to_date { background: var(--green); } .dot.error { background: var(--red); }
 .name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

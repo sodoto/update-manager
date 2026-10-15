@@ -142,6 +142,11 @@ class RegistryClient:
             query["service"] = params["service"]
         auth = (creds.username, creds.password) if creds else None
         resp = await self._http.get(params["realm"], params=query, auth=auth)
+        if resp.status_code in (401, 403) and auth:
+            # The saved login was rejected: public images still work anonymously.
+            resp = await self._http.get(params["realm"], params=query)
+            if resp.status_code != 200:
+                raise RegistryError(f"the {ref.registry} login in Settings > Registry logins was rejected")
         if resp.status_code != 200:
             raise RegistryError(f"token request failed (HTTP {resp.status_code})")
         body = resp.json()

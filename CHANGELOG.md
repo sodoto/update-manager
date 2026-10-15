@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.10.0 (2026-10-15)
+- Docker Compose stacks: containers of the same Compose project are grouped under a stack header
+  ("immich · 4 containers · 2 to update").
+- **Update stack** button: `docker compose pull` + `up -d` for the whole project at once, which apps like
+  Immich need so all their parts stay on the same version. The confirmation lists every container.
+  Needs update gateway v3: paste the update setup block from Settings on each node again.
+- The ⓘ window also shows the command to update a whole stack by hand.
+- Registry logins: if a saved login is rejected, public images are still checked anonymously, and the
+  error now says which login in Settings was rejected.
+
 ## 1.9.2 (2026-10-15)
 - Community scripts: recently installed LXCs (e.g. Paperless-ngx) were not detected. Their new
   `/usr/bin/update` names the script through UPDATE_SCRIPT_NAME instead of a ct/<app>.sh address.
