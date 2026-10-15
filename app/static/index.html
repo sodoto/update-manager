@@ -27,6 +27,7 @@
     <div id="banner"></div>
     <div class="toolbar">
       <input id="search" type="search" placeholder="Search by name, image, host…">
+      <button id="collapseAll">Collapse all</button>
       <select id="kind">
         <option value="">All types</option>
         <option value="docker">Docker containers</option>
@@ -40,6 +41,13 @@
   <main id="settingsView" hidden></main>
 </div>
 
+<div class="modal-backdrop" id="modal" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <button class="modal-close" id="modalClose" aria-label="Close">×</button>
+    <div id="modalBody"></div>
+  </div>
+</div>
+
 <div class="savebar" id="savebar" hidden>
   <div class="inner">
     <span class="msg" id="saveMsg">You have unsaved changes</span>
@@ -49,6 +57,7 @@
 </div>
 
 <script src="static/common.js"></script>
+<script src="static/howto.js"></script>
 <script src="static/dashboard.js"></script>
 <script src="static/settings.js"></script>
 </body>

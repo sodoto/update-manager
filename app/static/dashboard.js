@@ -6,6 +6,14 @@ const Dashboard = (() => {
   let filter = "all";
   let timer;
   const open = new Set();
+  const collapsed = new Set(loadCollapsed());
+
+  function loadCollapsed() {
+    try { return JSON.parse(localStorage.getItem("um.collapsed") || "[]"); } catch { return []; }
+  }
+  function saveCollapsed() {
+    try { localStorage.setItem("um.collapsed", JSON.stringify([...collapsed])); } catch { /* storage unavailable */ }
+  }
 
   async function load() {
     clearTimeout(timer);
@@ -61,12 +69,18 @@ const Dashboard = (() => {
 
     const groups = {};
     for (const i of shown) (groups[i.source] ??= []).push(i);
-    $("list").innerHTML = Object.keys(groups).sort().map(src => {
+    const names = Object.keys(groups).sort();
+    $("collapseAll").textContent = names.every(n => collapsed.has(n)) ? "Expand all" : "Collapse all";
+    $("list").innerHTML = names.map(src => {
       const list = groups[src].sort((a, b) => (ORDER[a.status] - ORDER[b.status])
         || (a.kind === b.kind ? 0 : a.kind === "host" ? -1 : b.kind === "host" ? 1 : a.kind.localeCompare(b.kind))
         || a.name.localeCompare(b.name));
       const upd = list.filter(i => i.status === "update_available").length;
-      return `<section class="group"><h2>${esc(src)} <span class="count">· ${list.length} item${list.length === 1 ? "" : "s"}${upd ? ` · ${upd} to update` : ""}</span></h2>${list.map(row).join("")}</section>`;
+      const folded = collapsed.has(src);
+      return `<section class="group ${folded ? "collapsed" : ""}">
+        <h2 data-group="${esc(src)}" role="button" tabindex="0" aria-expanded="${!folded}"><span class="chev">▾</span>${esc(src)}
+          <span class="count">· ${list.length} item${list.length === 1 ? "" : "s"}${upd ? ` · ${upd} to update` : ""}</span></h2>
+        ${folded ? "" : list.map(row).join("")}</section>`;
     }).join("");
   }
 
@@ -82,6 +96,8 @@ const Dashboard = (() => {
     if (i.stale) badges.push(`<span class="badge">Stale</span>`);
 
     const buttons = [];
+    if (i.status === "update_available")
+      buttons.push(`<button class="icon-btn" data-howto="${esc(i.id)}" title="How to update" aria-label="How to update ${esc(i.name)}">i</button>`);
     if (i.packages.length || i.kind === "docker" || i.note)
       buttons.push(`<button data-toggle="${esc(i.id)}">${open.has(i.id) ? "Hide" : "Details"}</button>`);
     if (i.link) buttons.push(`<a class="btn" href="${esc(i.link)}" target="_blank" rel="noopener">Dockhand ↗</a>`);
@@ -125,7 +141,26 @@ const Dashboard = (() => {
     const card = e.target.closest("[data-filter]");
     if (card) { filter = card.dataset.filter; render(); return; }
     const t = e.target.closest("[data-toggle]");
-    if (t) { const id = t.dataset.toggle; open.has(id) ? open.delete(id) : open.add(id); render(); }
+    if (t) { const id = t.dataset.toggle; open.has(id) ? open.delete(id) : open.add(id); render(); return; }
+    const h = e.target.closest("[data-howto]");
+    if (h) { HowTo.open(state.items.find(i => i.id === h.dataset.howto)); return; }
+    const g = e.target.closest("[data-group]");
+    if (g) {
+      const name = g.dataset.group;
+      collapsed.has(name) ? collapsed.delete(name) : collapsed.add(name);
+      saveCollapsed(); render();
+    }
+  });
+  document.addEventListener("keydown", (e) => {
+    const g = e.target.closest?.("[data-group]");
+    if (g && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); g.click(); }
+  });
+  $("collapseAll").addEventListener("click", () => {
+    if (!state) return;
+    const names = [...new Set(state.items.map(i => i.source))];
+    const expand = names.every(n => collapsed.has(n));
+    names.forEach(n => expand ? collapsed.delete(n) : collapsed.add(n));
+    saveCollapsed(); render();
   });
   $("search").addEventListener("input", () => state && render());
   $("kind").addEventListener("change", () => state && render());

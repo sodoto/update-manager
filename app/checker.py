@@ -44,8 +44,12 @@ def _signature(item: dict) -> str:
 
 
 async def _docker_item(c: ContainerInfo, registry: RegistryClient, group: str, source: str,
-                       id_prefix: str, link: str | None) -> dict:
-    item = _item("docker", f"{id_prefix}:{c.name}", group, source, c.name, c.image, state=c.state, link=link)
+                       id_prefix: str, link: str | None, vmid: int | None = None) -> dict:
+    item = _item("docker", f"{id_prefix}:{c.name}", group, source, c.name, c.image, state=c.state, link=link,
+                 vmid=vmid,
+                 # Used by the "how to update" instructions.
+                 compose_dir=c.labels.get("com.docker.compose.project.working_dir"),
+                 compose_service=c.labels.get("com.docker.compose.service"))
     if c.ignored:
         return {**item, "status": "skipped", "note": "ignored by label"}
     if not c.image or c.image.startswith("sha256:"):
@@ -209,7 +213,7 @@ class Checker:
                         link = f"http://{ip}:{port}"
                         item["link"] = link  # this LXC runs its own Dockhand
                 items += await asyncio.gather(*(
-                    _docker_item(c, registry, group, source, id_prefix, link) for c in containers
+                    _docker_item(c, registry, group, source, id_prefix, link, vmid) for c in containers
                 ))
             except Exception as exc:
                 items.append(_item("docker", f"{id_prefix}:*", group, source, f"Docker in {name}", "",
