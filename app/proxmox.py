@@ -12,7 +12,7 @@ import asyncssh
 from .config import ProxmoxNode
 from .keys import ensure_app_key, ensure_update_key
 
-GATEWAY_VERSION = 3  # version of gateway/update-manager-ro.sh this app ships
+GATEWAY_VERSION = 4  # version of gateway/update-manager-ro.sh this app ships
 APPLY_VERSION = 2  # version of gateway/update-manager-apply.sh this app ships
 
 

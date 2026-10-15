@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.9.2 (2026-10-15)
+- Community scripts: recently installed LXCs (e.g. Paperless-ngx) were not detected. Their new
+  `/usr/bin/update` names the script through UPDATE_SCRIPT_NAME instead of a ct/<app>.sh address.
+  Both formats are now recognized. With the older gateway, the container name is used as a fallback.
+- Read-only gateway v4: sends the relevant lines of /usr/bin/update so future format changes can be
+  handled in the app. Paste the read-only setup block again on each node (the app reminds you).
+
 ## 1.9.1 (2026-10-15)
 - Community scripts: apps that update themselves (e.g. AdGuard Home) were wrongly described as "updated
   through the OS packages". Their script's `update` only updates the OS; the app is now shown as updating

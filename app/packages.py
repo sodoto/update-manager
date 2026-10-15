@@ -11,7 +11,7 @@ class PackageReport:
     warnings: list[str] = field(default_factory=list)
     reboot_required: bool = False
     has_docker: bool = False
-    community_script: str | None = None  # e.g. "homarr" for an LXC made by ct/homarr.sh
+    community_script: str | None = None  # e.g. "homarr" for an LXC made by ct/homarr.sh ("" = name unknown)
     app_versions: dict[str, str] = field(default_factory=dict)  # version files, e.g. {".homarr": "1.30.0"}
 
     @property
@@ -19,6 +19,13 @@ class PackageReport:
         return sum(1 for p in self.packages if p.get("security"))
 
 
+# /usr/bin/update formats: older ones call .../ct/<slug>.sh directly; newer ones (2026) set
+# UPDATE_SCRIPT_NAME="<slug>" (and SCRIPT_SLUG) and call .../ct/${UPDATE_SCRIPT_NAME}.sh
+SLUG_PATTERNS = [
+    re.compile(r'UPDATE_SCRIPT_NAME="?([A-Za-z0-9._-]+)"?'),
+    re.compile(r'SCRIPT_SLUG="?([A-Za-z0-9._-]+)"?'),
+    re.compile(r"/ct/([A-Za-z0-9._-]+)\.sh"),
+]
 APT_RE = re.compile(r"^(\S+?)/(\S+)\s+(\S+)\s+\S+\s+\[upgradable from: ([^\]]+)\]")
 APK_RE = re.compile(r"^(\S+)\s+\S+\s+\{.*?\}\s+\(.*?\)\s+\[upgradable from: (\S+)\]")
 APK_VER_RE = re.compile(r"^(.+?)-(\d[^-]*-r\d+)$")
@@ -48,8 +55,15 @@ def parse_check_output(output: str) -> PackageReport:
                 report.os_name = value.strip('"')
             elif tag == "DOCKER":
                 report.has_docker = True
-            elif tag == "CS" and value.startswith("ct/") and value.endswith(".sh"):
-                report.community_script = value[3:-3]
+            elif tag == "CS":
+                if report.community_script is None:  # a community-scripts LXC; the name may come from @@CSL
+                    report.community_script = value[3:-3] if value.startswith("ct/") and value.endswith(".sh") else ""
+            elif tag == "CSL":
+                for pattern_index, pattern in enumerate(SLUG_PATTERNS):
+                    m = pattern.search(value)
+                    if m and (not report.community_script or pattern_index == 0):
+                        report.community_script = m.group(1)
+                        break
             elif tag == "CSV" and "=" in value:
                 key, _, version = value.partition("=")
                 report.app_versions[key] = version

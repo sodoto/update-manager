@@ -7,7 +7,7 @@
 # The only thing a check may write is the package index cache (apt-get update / apk update),
 # and only when the app asks for "refresh" - installed software is never touched.
 set -u
-VERSION=3
+VERSION=4
 
 read -r -d '' CHECK <<'EOF'
 export LC_ALL=C
@@ -38,6 +38,8 @@ command -v docker >/dev/null 2>&1 && echo "@@DOCKER"
 # Proxmox VE community-scripts LXC: which script created it, and the app versions it recorded (read only).
 if [ -f /usr/bin/update ] && grep -q "community-scripts/ProxmoxVE" /usr/bin/update 2>/dev/null; then
   echo "@@CS $(grep -o 'ct/[A-Za-z0-9._-]*\.sh' /usr/bin/update | head -n 1)"
+  # The lines that name the script (the app parses them, so new formats don't need a new gateway).
+  grep -E 'ct/|SCRIPT_SLUG=|UPDATE_SCRIPT_NAME=' /usr/bin/update | head -n 6 | cut -c1-200 | sed 's/^/@@CSL /'
   for f in /root/.[!.]* /opt/*_version.txt; do
     [ -f "$f" ] && [ "$(wc -c < "$f")" -le 64 ] || continue
     v=$(head -n 1 "$f" | tr -d '\r\n\t ')

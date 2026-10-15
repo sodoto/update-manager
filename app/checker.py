@@ -3,6 +3,7 @@ import asyncio
 import hashlib
 import json
 import logging
+import re
 from urllib.parse import urlsplit
 from datetime import datetime, timezone
 
@@ -213,7 +214,10 @@ class Checker:
                 return [item] if node.check_lxc else []
         item, report = self._apply_report_full(item, code, out, err)
         has_docker = bool(report and report.has_docker)
-        if report and report.community_script:
+        if report and report.community_script is not None:
+            if not report.community_script:
+                # Older gateway that couldn't read the script name: scripts name the LXC after themselves.
+                report.community_script = re.sub(r"[^A-Za-z0-9._-]", "", name.lower())
             await self._check_app(item, report)
         ip = await session.lxc_ip(vmid)
         item["ip"] = ip  # shown in the "how to update" instructions (ssh root@ip)
