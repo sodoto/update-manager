@@ -75,4 +75,4 @@ To update: `git pull && docker compose up -d --build`.
 - **Ignore an LXC:** list its ID under *Skip these LXC IDs*.
 - **Pinned and local images:** containers pinned to a digest, and locally built images, are shown as *Skipped*.
 - **Where things are stored:** settings live in `config.yaml` in the data folder (`/var/lib/update-manager` in an LXC, `./data` with Docker), next to the app's SSH key. Keep that folder private.
-- **Set a dashboard login** under **Settings → Dashboard login**. Without one, anyone on your network can open the dashboard and its settings.
+- **Set a dashboard login** under **Settings → Dashboard login**. Without one, anyone on your network can open the dashboard and its settings. With one, the app shows its own sign-in page; the password is stored hashed and you stay signed in for 30 days. Forgot it? Delete the `ui_username` and `ui_password` lines from `config.yaml` in the data folder and restart the app.

@@ -65,11 +65,17 @@ class Settings(_Model):
     allow_self_update: bool = True  # allow updating Update Manager from the dashboard (LXC install)
     allow_updates: bool = False  # allow installing updates on LXCs (needs the update key on each node)
     ui_username: str | None = None
-    ui_password: str | None = None
+    ui_password: str | None = None  # stored hashed (scrypt$...), never in plain text
     docker_hosts: list[DockerHost] = Field(default_factory=list)
     proxmox: list[ProxmoxNode] = Field(default_factory=list)
     registries: list[RegistryAuth] = Field(default_factory=list)
     notify: Notify = Field(default_factory=Notify)
+
+    @model_validator(mode="after")
+    def _login_pair(self):
+        if bool(self.ui_username) != bool(self.ui_password):
+            raise ValueError("the dashboard login needs both a username and a password (or neither)")
+        return self
 
     @model_validator(mode="after")
     def _updates_need_login(self):

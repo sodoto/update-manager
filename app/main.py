@@ -7,12 +7,12 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse
-from fastapi.security import HTTPBasic, HTTPBasicCredentials
+from fastapi import Depends, FastAPI, HTTPException, Request, Response
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
 
+from . import auth
 from .checker import CheckBusy, Checker
 from .config import (CONFIG_PATH, DockerHost, Notify, ProxmoxNode, Settings, load_settings,
                      save_settings, validation_message)
@@ -75,9 +75,19 @@ def _start_scheduler(run_now: bool) -> None:
     _scheduler_task = asyncio.create_task(_scheduler(run_now))
 
 
+def _migrate_plain_password() -> None:
+    """Older versions stored the dashboard password in plain text: hash it."""
+    s = checker.settings
+    if s.ui_password and not auth.is_hashed(s.ui_password):
+        checker.settings = s.model_copy(update={"ui_password": auth.hash_password(s.ui_password)})
+        save_settings(checker.settings)
+        log.info("Dashboard password is now stored hashed")
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     ensure_app_key()
+    _migrate_plain_password()
     if not CONFIG_PATH.exists():
         log.warning("No config at %s yet - open the Settings page to configure", CONFIG_PATH)
     _start_scheduler(checker.settings.check_on_start)
@@ -91,18 +101,27 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(title="Update Manager", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
-_basic = HTTPBasic(auto_error=False)
 
 
-def require_auth(creds: HTTPBasicCredentials | None = Depends(_basic)) -> None:
+def _login_enabled() -> bool:
+    return bool(checker.settings.ui_username and checker.settings.ui_password)
+
+
+def _signed_in(request: Request) -> bool:
     s = checker.settings
-    if not s.ui_username:
-        return
-    ok = creds is not None and secrets.compare_digest(
-        creds.username.encode(), s.ui_username.encode()
-    ) and secrets.compare_digest(creds.password.encode(), (s.ui_password or "").encode())
-    if not ok:
-        raise HTTPException(401, "Unauthorized", headers={"WWW-Authenticate": 'Basic realm="Update Manager"'})
+    return not _login_enabled() or auth.valid_session(request.cookies.get(auth.COOKIE), s.ui_username, s.ui_password)
+
+
+def require_auth(request: Request) -> None:
+    if not _signed_in(request):
+        raise HTTPException(401, "Please sign in")
+
+
+def _set_session(response: Response, request: Request, username: str, password_hash: str) -> None:
+    response.set_cookie(
+        auth.COOKIE, auth.make_session(username, password_hash), max_age=auth.SESSION_DAYS * 86400,
+        httponly=True, samesite="strict", secure=request.url.scheme == "https", path="/",
+    )
 
 
 async def json_body(request: Request) -> dict:
@@ -141,6 +160,8 @@ def _unmask_notify(new: dict, old: Notify) -> dict:
 def _unmask(new: dict, old: Settings) -> dict:
     if new.get("ui_password") == MASK:
         new["ui_password"] = old.ui_password
+    elif new.get("ui_password"):
+        new["ui_password"] = auth.hash_password(new["ui_password"])  # a new password was typed
     old_passwords = {r.registry: r.password for r in old.registries}
     for reg in new.get("registries") or []:
         if reg.get("password") == MASK:
@@ -164,18 +185,57 @@ async def health():
     return {"ok": True}
 
 
-@app.get("/", dependencies=[Depends(require_auth)])
-async def index():
+def _page(name: str) -> HTMLResponse:
     # Version-stamp the scripts and styles so browsers fetch fresh copies after every update.
-    html = (STATIC / "index.html").read_text(encoding="utf-8")
+    html = (STATIC / name).read_text(encoding="utf-8")
     html = re.sub(r'(static/[\w.-]+\.(?:js|css))"', rf'\1?v={APP_VERSION}"', html)
     return HTMLResponse(html, headers={"Cache-Control": "no-cache"})
+
+
+@app.get("/login")
+async def login_page(request: Request):
+    if not _login_enabled() or _signed_in(request):
+        return RedirectResponse("./", status_code=303)
+    return _page("login.html")
+
+
+@app.post("/api/login")
+async def login(request: Request, response: Response, body: dict = Depends(json_body)):
+    client = request.client.host if request.client else "?"
+    wait = auth.retry_after(client)
+    if wait:
+        raise HTTPException(429, f"Too many attempts. Try again in {wait} seconds.")
+    s = checker.settings
+    username, password = str(body.get("username", "")), str(body.get("password", ""))
+    ok = (_login_enabled() and secrets.compare_digest(username.encode(), (s.ui_username or "").encode())
+          and auth.verify_password(password, s.ui_password))
+    if not ok:
+        auth.record_failure(client)
+        log.warning("Failed sign-in for %r from %s", username, client)
+        raise HTTPException(401, "Wrong username or password")
+    auth.clear_failures(client)
+    _set_session(response, request, s.ui_username, s.ui_password)
+    return {"ok": True}
+
+
+@app.post("/api/logout")
+async def logout(response: Response, _: dict = Depends(json_body)):
+    response.delete_cookie(auth.COOKIE, path="/")
+    return {"ok": True}
+
+
+@app.get("/")
+async def index(request: Request):
+    if not _signed_in(request):
+        return RedirectResponse("login", status_code=303)
+    return _page("index.html")
 
 
 @app.get("/api/state", dependencies=[Depends(require_auth)])
 async def state():
     return {**checker.public_state(), "version": APP_VERSION,
             "allow_updates": checker.settings.allow_updates, "jobs": jobs.summaries(),
+            "login_enabled": _login_enabled(),
             "app": app_updates.public(checker.settings.allow_self_update)}
 
 
@@ -202,7 +262,7 @@ async def self_update_log():
 
 
 @app.post("/api/check", status_code=202, dependencies=[Depends(require_auth)])
-async def check_now():
+async def check_now(_: dict = Depends(json_body)):
     if not checker.running:
         _spawn(_safe_check())
     return {"started": True}
@@ -234,11 +294,13 @@ async def get_settings():
 
 
 @app.put("/api/settings", dependencies=[Depends(require_auth)])
-async def put_settings(body: dict = Depends(json_body)):
+async def put_settings(request: Request, response: Response, body: dict = Depends(json_body)):
     old = checker.settings
     new = _validate(Settings, _unmask(body, old))
     save_settings(new)
     checker.settings = new
+    if new.ui_username and (new.ui_username, new.ui_password) != (old.ui_username, old.ui_password):
+        _set_session(response, request, new.ui_username, new.ui_password)  # keep whoever changed it signed in
     sources_changed = any(
         getattr(old, f) != getattr(new, f) for f in ("docker_hosts", "proxmox", "registries")
     )

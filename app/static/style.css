@@ -84,6 +84,22 @@ button.link:hover { background: none; text-decoration: underline; }
 .bad-text { color: var(--red); font-weight: 600; }
 .run-note { display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; margin: 10px 0 4px; }
 
+/* sign-in page */
+.login-body { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 16px; }
+.login-card { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 28px 26px;
+  width: 100%; max-width: 360px; box-shadow: 0 10px 30px rgba(0,0,0,.08); }
+.login-card h1 { font-size: 20px; margin: 0 0 4px; }
+.login-card form { display: flex; flex-direction: column; gap: 14px; margin-top: 18px; }
+.login-card button { justify-content: center; padding: 9px 14px; }
+.login-error { margin: 0; color: var(--red); background: var(--red-bg); border-radius: 8px; padding: 7px 10px; font-size: 13px; }
+
+/* confirmation dialog (above the modal) */
+.modal-backdrop.dialog-layer { z-index: 30; align-items: center; }
+.modal.dialog { max-width: 440px; }
+.dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+button.danger-fill { background: var(--red); border-color: var(--red); color: #fff; }
+button.danger-fill:hover { filter: brightness(1.1); background: var(--red); }
+
 /* modal */
 .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 20; display: flex;
   align-items: flex-start; justify-content: center; padding: 6vh 16px; overflow-y: auto; }

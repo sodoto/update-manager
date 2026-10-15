@@ -200,7 +200,8 @@ const Settings = (() => {
         ${s.ui_username ? "" : `<div class="warn">No login set: anyone on your network can open this dashboard and its settings.</div>`}
         <div class="grid">
           ${input("Username", "ui_username")}
-          ${input("Password", "ui_password", { type: "password" })}
+          ${input("Password", "ui_password", { type: "password",
+            hint: "Stored encrypted (hashed). To change it, type a new one; leave the dots to keep it." })}
         </div>
         <p class="help" style="margin-top:10px">Settings are stored in <code>${esc(meta.config_path)}</code>.</p>
       </section>`;

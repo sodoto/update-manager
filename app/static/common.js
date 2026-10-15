@@ -9,6 +9,10 @@ async function api(path, method = "GET", body) {
   }
   // Resolve against the origin, not the page URL: a page opened as http://user:pass@host/ can't fetch relative URLs.
   const r = await fetch(new URL(path, location.origin + location.pathname), opts);
+  if (r.status === 401) {  // signed out (or the session expired): go to the sign-in page
+    location.href = "login" + location.hash;
+    throw new Error("Please sign in");
+  }
   let data = null;
   try { data = await r.json(); } catch { /* empty body */ }
   if (!r.ok) throw new Error((data && data.detail) || `HTTP ${r.status}`);
@@ -42,6 +46,50 @@ async function copyText(text) {
   }
 }
 
+// In-app confirmation and message dialogs (instead of the browser's confirm() / alert()).
+const UI = (() => {
+  let resolve = null;
+  let returnFocus = null;
+
+  function open({ title, message, ok = "OK", cancel = "Cancel", danger = false }) {
+    $("dialogTitle").textContent = title;
+    $("dialogMsg").innerHTML = String(message || "").split(/\n\s*\n/)
+      .map(p => `<p>${esc(p).replace(/\n/g, "<br>")}</p>`).join("");
+    $("dialogOk").textContent = ok;
+    $("dialogOk").className = danger ? "danger-fill" : "primary";
+    $("dialogCancel").hidden = cancel === null;
+    $("dialogCancel").textContent = cancel || "";
+    returnFocus = document.activeElement;
+    $("dialog").hidden = false;
+    $("dialogOk").focus();
+    return new Promise(r => { resolve = r; });
+  }
+
+  function close(result) {
+    if (!resolve) return;
+    $("dialog").hidden = true;
+    const r = resolve;
+    resolve = null;
+    if (returnFocus && document.contains(returnFocus)) returnFocus.focus();
+    r(result);
+  }
+
+  document.addEventListener("DOMContentLoaded", () => {
+    $("dialogOk").addEventListener("click", () => close(true));
+    $("dialogCancel").addEventListener("click", () => close(false));
+    $("dialog").addEventListener("click", (e) => { if (e.target === $("dialog")) close(false); });
+  });
+  document.addEventListener("keydown", (e) => {
+    if (!resolve) return;
+    if (e.key === "Escape") { e.stopImmediatePropagation(); close(false); }
+  }, true);
+
+  return {
+    confirm: (opts) => open(opts),
+    alert: (title, message) => open({ title, message, cancel: null }),
+  };
+})();
+
 function route() {
   const settings = location.hash === "#settings";
   $("dashboardView").hidden = settings;
@@ -51,4 +99,11 @@ function route() {
   if (settings) Settings.open(); else Settings.close();
 }
 window.addEventListener("hashchange", route);
-document.addEventListener("DOMContentLoaded", () => { route(); Dashboard.load(); });
+document.addEventListener("DOMContentLoaded", () => {
+  route();
+  Dashboard.load();
+  $("logoutBtn").addEventListener("click", async () => {
+    await api("api/logout", "POST", {}).catch(() => {});
+    location.href = "login";
+  });
+});

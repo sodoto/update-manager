@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.7.0 (2026-10-15)
+- Built-in sign-in page instead of the browser's login pop-up, with a Log out button.
+  You stay signed in for 30 days; changing the password signs out every other browser.
+- The dashboard password is now stored hashed (existing passwords are converted automatically).
+- Repeated wrong passwords lock sign-in for 60 seconds.
+- Confirmations and messages use the app's own windows instead of the browser's pop-ups.
+
 ## 1.6.0 (2026-10-15)
 - Optional: run updates from the app. An **Update** button installs package updates in an LXC or updates a
   Docker Compose container, with live output, then re-checks the row. Offers to restart the LXC when needed.

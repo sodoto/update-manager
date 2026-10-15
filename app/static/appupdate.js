@@ -73,11 +73,16 @@ const AppUpdate = (() => {
   }
 
   async function start() {
-    if (!confirm(`Update Update Manager from v${info.version} to v${info.latest}?\n\nThe app restarts; this takes about a minute.`)) return;
+    const ok = await UI.confirm({
+      title: `Update Update Manager to v${info.latest}?`, ok: "Update now",
+      message: `You have v${info.version}. The app restarts during the update; this takes about a minute `
+        + `and the page reloads by itself.`,
+    });
+    if (!ok) return;
     try {
       await api("api/app/update", "POST", {});
     } catch (e) {
-      alert(`Could not start the update: ${e.message}`);
+      UI.alert("Could not start the update", e.message);
       return;
     }
     HowTo.close();

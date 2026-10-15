@@ -11,24 +11,32 @@ const Jobs = (() => {
     return false;
   }
 
-  function confirmText(i, action) {
-    if (action === "reboot") return `Restart ${i.name} (CT ${i.vmid}) now?\n\nIts services will be unavailable for a moment.`;
-    if (action === "compose-update")
-      return `Update ${i.name} now?\n\nThis pulls the new image for ${i.detail} and recreates the container `
-        + `(docker compose pull + up -d in ${i.compose_dir}). Data in volumes is kept.`;
-    return `Install ${i.update_count} package update(s) on ${i.name} (CT ${i.vmid}) now?\n\n`
-      + `Runs a non-interactive upgrade inside the container. Your config files are kept.`;
+  function confirmation(i, action) {
+    if (action === "reboot") return {
+      title: `Restart ${i.name}?`, ok: "Restart", danger: true,
+      message: `CT ${i.vmid} will restart now. Its services will be unavailable for a moment.`,
+    };
+    if (action === "compose-update") return {
+      title: `Update ${i.name}?`, ok: "Update",
+      message: `Pulls the new image for ${i.detail} and recreates the container `
+        + `(docker compose pull + up -d in ${i.compose_dir}).\n\nData in volumes is kept.`,
+    };
+    return {
+      title: `Update ${i.name}?`, ok: "Install updates",
+      message: `Installs ${i.update_count} package update${i.update_count === 1 ? "" : "s"} inside CT ${i.vmid}.`
+        + `\n\nRuns a non-interactive upgrade. Your configuration files are kept.`,
+    };
   }
 
   async function start(item, action) {
     action = action || (item.kind === "docker" ? "compose-update" : "upgrade");
-    if (!confirm(confirmText(item, action))) return;
+    if (!(await UI.confirm(confirmation(item, action)))) return;
     try {
       const job = await api("api/jobs", "POST", { id: item.id, action });
       view(job.id);
       Dashboard.load();
     } catch (e) {
-      alert(`Could not start: ${e.message}`);
+      UI.alert("Could not start the update", e.message);
     }
   }
 

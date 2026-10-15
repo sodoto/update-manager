@@ -20,6 +20,7 @@
     <span class="meta" id="meta"></span>
     <span class="meta" id="version"></span>
     <button class="primary" id="checkBtn">Check now</button>
+    <button id="logoutBtn" hidden>Log out</button>
   </header>
 
   <div id="appBanner"></div>
@@ -47,6 +48,17 @@
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
     <button class="modal-close" id="modalClose" aria-label="Close">×</button>
     <div id="modalBody"></div>
+  </div>
+</div>
+
+<div class="modal-backdrop dialog-layer" id="dialog" hidden>
+  <div class="modal dialog" role="alertdialog" aria-modal="true" aria-labelledby="dialogTitle" aria-describedby="dialogMsg">
+    <h3 id="dialogTitle"></h3>
+    <div id="dialogMsg"></div>
+    <div class="dialog-actions">
+      <button id="dialogCancel">Cancel</button>
+      <button class="primary" id="dialogOk">OK</button>
+    </div>
   </div>
 </div>
 

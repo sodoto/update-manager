@@ -33,6 +33,7 @@ const Dashboard = (() => {
   function render() {
     const items = state.items;
     const count = (fn) => items.filter(fn).length;
+    $("logoutBtn").hidden = !state.login_enabled;
     const pill = $("modePill");
     pill.textContent = state.allow_updates ? "Updates enabled" : "Read-only";
     pill.classList.toggle("rw", !!state.allow_updates);
