@@ -32,8 +32,7 @@ else
   rm -rf "$SRC_DIR"
   git clone -q --depth 1 --branch "$BRANCH" "$REPO_URL" "$SRC_DIR"
 fi
-VERSION="$(git -C "$SRC_DIR" log -1 --format='%h (%cs)')"
-echo "$VERSION" > "$SRC_DIR/app/VERSION"
+VERSION="$(cat "$SRC_DIR/VERSION")"
 
 echo "==> Installing Python dependencies"
 [ -x "$APP_DIR/venv/bin/python" ] || python3 -m venv "$APP_DIR/venv"
@@ -72,5 +71,5 @@ systemctl restart update-manager
 
 IP=$(hostname -I | awk '{print $1}')
 echo
-echo "Update Manager $VERSION is running: http://$IP:8080"
+echo "Update Manager v$VERSION is running: http://$IP:8080"
 echo "To update later, run: update-manager-update"

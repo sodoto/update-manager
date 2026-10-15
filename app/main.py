@@ -26,7 +26,7 @@ for noisy in ("asyncssh", "httpx"):
     logging.getLogger(noisy).setLevel(logging.WARNING)
 
 STATIC = Path(__file__).parent / "static"
-VERSION_FILE = Path(__file__).parent / "VERSION"  # written by install-lxc.sh
+VERSION_FILE = Path(__file__).parent.parent / "VERSION"
 APP_VERSION = VERSION_FILE.read_text(encoding="utf-8").strip() if VERSION_FILE.exists() else "dev"
 MASK = "********"
 checker = Checker(load_settings())
