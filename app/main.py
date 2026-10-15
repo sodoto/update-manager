@@ -12,7 +12,7 @@ from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
 
-from .checker import Checker
+from .checker import CheckBusy, Checker
 from .config import (CONFIG_PATH, DockerHost, Notify, ProxmoxNode, Settings, load_settings,
                      save_settings, validation_message)
 from .docker_sources import DockerAPISource
@@ -199,6 +199,19 @@ async def check_now():
     if not checker.running:
         _spawn(_safe_check())
     return {"started": True}
+
+
+@app.post("/api/check-item", dependencies=[Depends(require_auth)])
+async def check_item(body: dict = Depends(json_body)):
+    try:
+        await checker.check_item(str(body.get("id", "")))
+    except CheckBusy as exc:
+        raise HTTPException(409, str(exc))
+    except LookupError as exc:
+        raise HTTPException(404, str(exc))
+    except Exception as exc:
+        raise HTTPException(502, str(exc) or exc.__class__.__name__)
+    return {"ok": True}
 
 
 @app.get("/api/settings", dependencies=[Depends(require_auth)])

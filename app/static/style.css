@@ -61,6 +61,8 @@ code { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size
 .group h2 .chev { display: inline-block; width: 12px; transition: transform .15s; color: var(--muted); }
 .group.collapsed h2 { border-bottom: 0; }
 .group.collapsed h2 .chev { transform: rotate(-90deg); }
+.recheck-error { color: var(--red); white-space: normal; font-size: 12.5px; }
+.icon-btn .spin { width: 12px; height: 12px; }
 .icon-btn { width: 26px; height: 26px; padding: 0 !important; justify-content: center; border-radius: 50% !important;
   font-weight: 700; font-size: 13px !important; color: var(--accent); }
 

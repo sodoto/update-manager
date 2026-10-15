@@ -6,6 +6,8 @@ const Dashboard = (() => {
   let filter = "all";
   let timer;
   const open = new Set();
+  const rechecking = new Set();
+  const recheckError = {};  // item id -> message from the last failed re-check
   const collapsed = new Set(loadCollapsed());
 
   function loadCollapsed() {
@@ -96,6 +98,10 @@ const Dashboard = (() => {
     if (i.stale) badges.push(`<span class="badge">Stale</span>`);
 
     const buttons = [];
+    const busy = rechecking.has(i.id) || (state.busy || []).includes(i.id);
+    buttons.push(`<button class="icon-btn" data-recheck="${esc(i.id)}" ${busy || state.running ? "disabled" : ""}
+      title="${i.kind === "lxc" ? "Check this container again (and its Docker containers)" : "Check this again"}"
+      aria-label="Check ${esc(i.name)} again">${busy ? '<span class="spin"></span>' : "↻"}</button>`);
     if (i.status === "update_available")
       buttons.push(`<button class="icon-btn" data-howto="${esc(i.id)}" title="How to update" aria-label="How to update ${esc(i.name)}">i</button>`);
     if (i.packages.length || i.kind === "docker" || i.note)
@@ -106,7 +112,8 @@ const Dashboard = (() => {
     return `<div class="row">
       <span class="dot ${i.status}" title="${STATUS[i.status]}"></span>
       <div><div class="name" title="${esc(i.name)}">${esc(i.name)}</div>${i.kind === "docker" && i.state ? `<div class="sub">${esc(i.state)}</div>` : ""}</div>
-      <div class="detail" title="${esc(i.note || i.detail)}">${detail}${i.note && i.status !== "update_available" ? ` — ${esc(i.note)}` : ""}</div>
+      <div class="detail" title="${esc(i.note || i.detail)}">${detail}${i.note && i.status !== "update_available" ? ` — ${esc(i.note)}` : ""}${
+        recheckError[i.id] ? `<div class="recheck-error">⚠ ${esc(recheckError[i.id])}</div>` : ""}</div>
       <div class="actions">${badges.join("")}${buttons.join("")}</div>
       ${open.has(i.id) ? `<div class="expand">${expand(i)}</div>` : ""}
     </div>`;
@@ -131,6 +138,19 @@ const Dashboard = (() => {
     return html;
   }
 
+  async function recheck(id) {
+    rechecking.add(id);
+    delete recheckError[id];
+    render();
+    try {
+      await api("api/check-item", "POST", { id });
+    } catch (e) {
+      recheckError[id] = e.message;
+    }
+    rechecking.delete(id);
+    await load();
+  }
+
   async function checkNow() {
     await api("api/check", "POST", {});
     if (state) { state.running = true; render(); }
@@ -142,6 +162,8 @@ const Dashboard = (() => {
     if (card) { filter = card.dataset.filter; render(); return; }
     const t = e.target.closest("[data-toggle]");
     if (t) { const id = t.dataset.toggle; open.has(id) ? open.delete(id) : open.add(id); render(); return; }
+    const rc = e.target.closest("[data-recheck]");
+    if (rc) { recheck(rc.dataset.recheck); return; }
     const h = e.target.closest("[data-howto]");
     if (h) { HowTo.open(state.items.find(i => i.id === h.dataset.howto)); return; }
     const g = e.target.closest("[data-group]");

@@ -71,10 +71,15 @@ async def _docker_item(c: ContainerInfo, registry: RegistryClient, group: str, s
     return item
 
 
+class CheckBusy(Exception):
+    pass
+
+
 class Checker:
     def __init__(self, settings: Settings):
         self.settings = settings
         self._lock = asyncio.Lock()
+        self._busy: set[str] = set()  # items being re-checked on their own
         self.state = {
             "running": False, "last_check_started": None, "last_check_finished": None,
             "next_check": None, "items": [], "errors": [], "warnings": [],
@@ -92,7 +97,7 @@ class Checker:
         return self._lock.locked()
 
     def public_state(self) -> dict:
-        return {**self.state, "running": self.running,
+        return {**self.state, "running": self.running, "busy": sorted(self._busy),
                 "configured": bool(self.settings.docker_hosts or self.settings.proxmox)}
 
     def _save(self) -> None:
@@ -143,7 +148,8 @@ class Checker:
                      len(items), sum(i["status"] == "update_available" for i in items), len(new_updates))
         await send_notifications(self.settings.notify, new_updates)
 
-    async def _check_docker_host(self, host: DockerHost, registry: RegistryClient, sem) -> list[dict]:
+    async def _check_docker_host(self, host: DockerHost, registry: RegistryClient, sem,
+                                 only: str | None = None) -> list[dict]:
         async with sem:
             containers = await DockerAPISource(host).list_containers()
         group = f"docker:{host.name}"
@@ -153,13 +159,13 @@ class Checker:
         if port and hostname:
             link = f"http://{hostname}:{port}"
         return list(await asyncio.gather(*(
-            _docker_item(c, registry, group, host.name, group, link) for c in containers
+            _docker_item(c, registry, group, host.name, group, link)
+            for c in containers if only is None or c.name == only
         )))
 
     async def _check_node(self, node: ProxmoxNode, registry: RegistryClient, sem) -> list[dict]:
         group = f"pve:{node.name}"
         items = []
-        refresh = self.settings.refresh_package_lists
         async with ProxmoxSession(node) as session:
             version = await session.require_gateway()
             if version < GATEWAY_VERSION:
@@ -167,10 +173,8 @@ class Checker:
                     f"read-only gateway v{version} is outdated (v{GATEWAY_VERSION} available): paste the setup "
                     "block from Settings on this node again to enable automatic Dockhand links."})
             if node.check_host:
-                item = _item("host", f"host:{node.name}", group, node.name, node.name, "Proxmox host", node=node.name)
                 async with sem:
-                    code, out, err = await session.check_host(refresh)
-                items.append(self._apply_report(item, code, out, err))
+                    items.append(await self._check_host(session, node))
             if node.check_lxc or node.check_docker_in_lxc:
                 containers = [c for c in await session.list_lxc() if int(c["vmid"]) not in node.exclude]
                 for result in await asyncio.gather(*(
@@ -178,6 +182,12 @@ class Checker:
                 )):
                     items += result
         return items
+
+    async def _check_host(self, session: ProxmoxSession, node: ProxmoxNode) -> dict:
+        item = _item("host", f"host:{node.name}", f"pve:{node.name}", node.name, node.name, "Proxmox host",
+                     node=node.name)
+        code, out, err = await session.check_host(self.settings.refresh_package_lists)
+        return self._apply_report(item, code, out, err)
 
     async def _check_lxc(self, session: ProxmoxSession, node: ProxmoxNode, ct: dict,
                          registry: RegistryClient, sem) -> list[dict]:
@@ -220,8 +230,81 @@ class Checker:
                 items += docker_items
             except Exception as exc:
                 items.append(_item("docker", f"{id_prefix}:*", group, source, f"Docker in {name}", "",
-                                   status="error", note=_err(exc)))
+                                   status="error", note=_err(exc), vmid=vmid, lxc_name=name))
         return items
+
+    # ------------------------------------------------------------------ single item
+
+    async def check_item(self, item_id: str) -> None:
+        """Re-checks one item: a host, an LXC (with the Docker containers inside it) or one Docker container."""
+        item = next((i for i in self.state["items"] if i["id"] == item_id), None)
+        if not item:
+            raise LookupError("this item is no longer in the results, run a full check")
+        if self.running:
+            raise CheckBusy("a full check is running, wait for it to finish")
+        if item_id in self._busy:
+            raise CheckBusy("this item is already being checked")
+        self._busy.add(item_id)
+        registry = RegistryClient(self.settings.registries)
+        try:
+            fresh, remove = await self._recheck(item, registry)
+        finally:
+            await registry.close()
+            self._busy.discard(item_id)
+
+        # Swap the old entries for the fresh ones, keeping their place in the list.
+        items, inserted = [], False
+        for i in self.state["items"]:
+            if i["id"] in remove:
+                if not inserted:
+                    items += fresh
+                    inserted = True
+                continue
+            items.append(i)
+        if not inserted:
+            items += fresh
+        self.state["items"] = items
+        self._save()
+        log.info("Re-checked %s", item_id)
+
+    async def _recheck(self, item: dict, registry: RegistryClient) -> tuple[list[dict], set[str]]:
+        """Returns (fresh items, ids of the items they replace)."""
+        sem = asyncio.Semaphore(max(1, self.settings.concurrency))
+        group = item["group"]
+        if group.startswith("docker:"):  # Docker host reached through its API
+            host = next((h for h in self.settings.docker_hosts if f"docker:{h.name}" == group), None)
+            if not host:
+                raise LookupError("this Docker host is no longer configured")
+            return await self._check_docker_host(host, registry, sem, only=item["name"]), {item["id"]}
+
+        node = next((n for n in self.settings.proxmox if f"pve:{n.name}" == group), None)
+        if not node:
+            raise LookupError("this Proxmox node is no longer configured")
+        async with ProxmoxSession(node) as session:
+            await session.require_gateway()
+            if item["kind"] == "host":
+                return [await self._check_host(session, node)], {item["id"]}
+
+            vmid = item.get("vmid")
+            docker_prefix = f"docker:{node.name}/{vmid}:"
+            if item["kind"] == "lxc" or item["id"].endswith(":*"):
+                # The LXC itself plus the Docker containers running inside it.
+                ct = next((c for c in await session.list_lxc() if int(c["vmid"]) == vmid), None)
+                remove = {i["id"] for i in self.state["items"]
+                          if i["id"] == f"lxc:{node.name}:{vmid}" or i["id"].startswith(docker_prefix)}
+                if not ct or vmid in node.exclude:
+                    return [], remove  # the container was deleted or excluded
+                return await self._check_lxc(session, node, ct, registry, sem), remove
+
+            # One Docker container inside an LXC.
+            containers = await DockerCLISource(session.docker_runner(vmid)).list_containers()
+            match = next((c for c in containers if c.name == item["name"]), None)
+            if not match:
+                return [], {item["id"]}  # the container was removed
+            fresh = await _docker_item(match, registry, group, item["source"], docker_prefix.rstrip(":"),
+                                       item.get("link"), vmid)
+            fresh.update(ip=item.get("ip"), lxc_name=item.get("lxc_name"))
+            return [fresh], {item["id"]}
 
     def _apply_report(self, item: dict, code: int, out: str, err: str) -> dict:
         return self._apply_report_full(item, code, out, err)[0]

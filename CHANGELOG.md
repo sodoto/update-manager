@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.5.0 (2026-10-15)
+- ↻ button on every row to check just that item again: an LXC (with the Docker containers inside it),
+  a single Docker container, or the Proxmox host. Handy right after updating something.
+
 ## 1.4.1 (2026-10-15)
 - Update instructions only mention the Proxmox Console to open a container's shell (no SSH).
 
