@@ -15,10 +15,9 @@ const HowTo = (() => {
   const arg = (s) => /^[\w@%+=:,./-]+$/.test(s) ? s : shq(s);  // quote only when needed
   const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
-  // How to get a shell inside an LXC: the Proxmox console, or SSH when we know its IP.
-  function access(id, name, ip) {
-    return `<p>${where(`Inside ${name}`)} Open a shell in the container: Proxmox → <b>CT ${id} → Console</b>${ip ? ", or with SSH:" : "."}</p>
-      ${ip ? cmd(`ssh root@${ip}`) + `<p class="hint">SSH only works if it is enabled in the container. The console always works.</p>` : ""}`;
+  // How to get a shell inside an LXC.
+  function access(id) {
+    return `<p>In Proxmox, open <b>CT ${id} → Console</b> and log in as <code>root</code>.</p>`;
   }
 
   function lxc(i) {
@@ -34,7 +33,7 @@ const HowTo = (() => {
       <p class="hint">Needs storage with snapshot support (ZFS, LVM-thin, Ceph). Otherwise use CT ${id} → Backup → Backup now.</p>
 
       <h4>2. Open the container's shell</h4>
-      ${access(id, i.name, i.ip)}
+      ${access(id)}
 
       <h4>3. Install the updates</h4>`;
     html += up ? `<p>${where(`Inside ${i.name}`)}</p>${cmd(up)}`
@@ -79,7 +78,7 @@ const HowTo = (() => {
       <p class="hint">Find the container (or its stack) and use its update / redeploy action, which pulls the new image and recreates it.</p>
 
       <h4>Option B: command line</h4>
-      ${inLxc ? access(i.vmid, lxcName, i.ip) : `<p>Open a shell on <b>${esc(i.source)}</b>.</p>`}`;
+      ${inLxc ? access(i.vmid) : `<p>Open a shell on <b>${esc(i.source)}</b>.</p>`}`;
     if (i.compose_dir) {
       const svc = i.compose_service ? ` ${i.compose_service}` : "";
       html += `<p>${place} This container belongs to the Compose project in <code>${esc(i.compose_dir)}</code>:</p>

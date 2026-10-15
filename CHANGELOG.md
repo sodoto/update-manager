@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.4.1 (2026-10-15)
+- Update instructions only mention the Proxmox Console to open a container's shell (no SSH).
+
 ## 1.4.0 (2026-10-15)
 - Click the version number in the header to check GitHub for a new version right away.
 - Update instructions now run inside the container (its console or SSH, with its IP address)
