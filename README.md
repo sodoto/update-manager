@@ -46,7 +46,7 @@ Off by default. When enabled (**Settings → Run updates from the app**), rows w
 2. Run:
    ```bash
    apt-get update && apt-get install -y curl
-   bash -c "$(curl -fsSL https://raw.githubusercontent.com/sodoto/update-manager/main/install-lxc.sh)"
+   bash -c "$(curl -fsSL https://raw.githubusercontent.com/sodoto/updrift/main/install-lxc.sh)"
    ```
 3. Open `http://<lxc-ip>:8080` and go to **Settings**.
 
@@ -59,7 +59,7 @@ The installed version is shown at the top of the dashboard. **Update now** only 
 ## Install with Docker
 
 ```bash
-git clone https://github.com/sodoto/update-manager.git && cd update-manager
+git clone https://github.com/sodoto/updrift.git && cd updrift
 docker compose up -d --build
 ```
 Open `http://<host>:8080` and go to **Settings**. To also watch the Docker host this runs on, add a Docker host with URL `tcp://docker-socket-proxy:2375`. The proxy is already in the compose file, with `POST=0`.

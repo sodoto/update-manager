@@ -15,7 +15,7 @@ from .config import DATA_DIR
 
 log = logging.getLogger("update-manager")
 
-REPO = os.environ.get("UPDATE_REPO", "sodoto/update-manager")
+REPO = os.environ.get("UPDATE_REPO", "sodoto/updrift")
 BRANCH = os.environ.get("UPDATE_BRANCH", "main")
 RAW_URL = f"https://raw.githubusercontent.com/{REPO}/{BRANCH}"
 INSTALL = os.environ.get("UM_INSTALL", "manual")  # "lxc" (install-lxc.sh), "docker", or "manual"

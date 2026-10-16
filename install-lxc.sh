@@ -2,14 +2,14 @@
 # Installs or updates Updrift as a systemd service in a Debian/Ubuntu LXC.
 #
 # First install (as root):
-#   bash -c "$(curl -fsSL https://raw.githubusercontent.com/sodoto/update-manager/main/install-lxc.sh)"
+#   bash -c "$(curl -fsSL https://raw.githubusercontent.com/sodoto/updrift/main/install-lxc.sh)"
 # Update later:
 #   update-manager-update
 #
 # Settings, results and the SSH key live in /var/lib/update-manager and are kept across updates.
 set -euo pipefail
 
-REPO_URL="${REPO_URL:-https://github.com/sodoto/update-manager.git}"
+REPO_URL="${REPO_URL:-https://github.com/sodoto/updrift.git}"
 BRANCH="${BRANCH:-main}"
 APP_DIR=/opt/update-manager
 SRC_DIR=$APP_DIR/src
@@ -26,6 +26,7 @@ mkdir -p "$APP_DIR" "$DATA_DIR"
 chmod 700 "$DATA_DIR"
 rm -rf "$APP_DIR/app" "$APP_DIR/requirements.txt"  # layout used by older versions of this script
 if [ -d "$SRC_DIR/.git" ]; then
+  git -C "$SRC_DIR" remote set-url origin "$REPO_URL"  # the repository was renamed (update-manager -> updrift)
   git -C "$SRC_DIR" fetch -q --depth 1 origin "$BRANCH"
   git -C "$SRC_DIR" reset -q --hard FETCH_HEAD
 else

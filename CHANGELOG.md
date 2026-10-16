@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.11.1 (2026-10-16)
+- The GitHub repository is now github.com/sodoto/updrift (the old address redirects). Updrift and its
+  installer now use the new address, and updating an existing install switches it over automatically.
+
 ## 1.11.0 (2026-10-16)
 - New name and icon: Update Manager is now **Updrift**, with a radar logo (in the header, the sign-in page and
   the browser tab). Nothing to reconfigure: the service, folders and Proxmox gateway scripts keep their names.
