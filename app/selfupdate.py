@@ -1,4 +1,4 @@
-"""Checks GitHub for new versions of Update Manager itself, and requests self-updates.
+"""Checks GitHub for new versions of Updrift itself, and requests self-updates.
 
 The app never updates itself in-process (the restart would kill the update halfway). On an LXC install,
 install-lxc.sh sets up a systemd path unit that watches REQUEST_FILE and runs update-manager-update.

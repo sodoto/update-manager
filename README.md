@@ -1,4 +1,8 @@
-# Update Manager
+<img src="app/static/logo.svg" alt="" width="64" height="64">
+
+# Updrift
+
+*Formerly "Update Manager".*
 
 One dashboard that shows which of your homelab apps need updates, without checking each one by hand. It is **read-only by default**: it looks, but never installs, restarts or changes anything. You can optionally allow it to run updates for you, through a separate, tightly restricted key.
 
@@ -46,7 +50,7 @@ Off by default. When enabled (**Settings → Run updates from the app**), rows w
    ```
 3. Open `http://<lxc-ip>:8080` and go to **Settings**.
 
-**Updating Update Manager:** when a new version is published, the dashboard shows a banner. Click **Update now** and the page reloads on the new version a minute later. Your settings are kept. Or run this in the LXC:
+**Updating Updrift:** when a new version is published, the dashboard shows a banner. Click **Update now** and the page reloads on the new version a minute later. Your settings are kept. Or run this in the LXC:
 ```bash
 update-manager-update
 ```

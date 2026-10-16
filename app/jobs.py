@@ -139,7 +139,7 @@ class JobRunner:
                 if version < APPLY_VERSION:
                     job.add(f"Note: this node has update gateway v{version}; output may only appear at the end. "
                             "Paste the update setup block from Settings on this node again for live output.")
-                job.add(f"Update Manager asks Proxmox: {' '.join(str(a) for a in args)}")
+                job.add(f"Updrift asks Proxmox: {' '.join(str(a) for a in args)}")
                 code = await session.stream(*args, on_line=job.add)
             job.exit_code = code
             job.status = "succeeded" if code == 0 else "failed"

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Installs or updates Update Manager as a systemd service in a Debian/Ubuntu LXC.
+# Installs or updates Updrift as a systemd service in a Debian/Ubuntu LXC.
 #
 # First install (as root):
 #   bash -c "$(curl -fsSL https://raw.githubusercontent.com/sodoto/update-manager/main/install-lxc.sh)"
@@ -41,7 +41,7 @@ echo "==> Installing Python dependencies"
 
 cat > /etc/systemd/system/update-manager.service <<EOF
 [Unit]
-Description=Update Manager
+Description=Updrift
 After=network-online.target
 Wants=network-online.target
 
@@ -58,7 +58,7 @@ EOF
 
 cat > /usr/local/bin/update-manager-update <<EOF
 #!/usr/bin/env bash
-# Downloads the latest Update Manager from GitHub and reinstalls it (settings are kept).
+# Downloads the latest Updrift from GitHub and reinstalls it (settings are kept).
 set -euo pipefail
 git -C "$SRC_DIR" fetch -q --depth 1 origin "$BRANCH"
 git -C "$SRC_DIR" reset -q --hard FETCH_HEAD
@@ -83,7 +83,7 @@ mv -f /usr/local/bin/update-manager-selfupdate.tmp /usr/local/bin/update-manager
 
 cat > /etc/systemd/system/update-manager-selfupdate.service <<EOF
 [Unit]
-Description=Update Manager self-update
+Description=Updrift self-update
 
 [Service]
 Type=oneshot
@@ -93,7 +93,7 @@ EOF
 
 cat > /etc/systemd/system/update-manager-selfupdate.path <<EOF
 [Unit]
-Description=Watch for Update Manager self-update requests
+Description=Watch for Updrift self-update requests
 
 [Path]
 PathExists=$DATA_DIR/self-update.request
@@ -109,5 +109,5 @@ systemctl restart update-manager
 
 IP=$(hostname -I | awk '{print $1}')
 echo
-echo "Update Manager v$VERSION is running: http://$IP:8080"
+echo "Updrift v$VERSION is running: http://$IP:8080"
 echo "To update later, run: update-manager-update"

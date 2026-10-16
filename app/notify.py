@@ -30,7 +30,7 @@ async def send_test(cfg: Notify) -> list[str]:
     """Sends a test message to every configured channel; returns the errors."""
     if not (cfg.ntfy_url or cfg.discord_webhook or cfg.webhook_url):
         return ["no notification channel configured"]
-    return await _send(cfg, "Update Manager test", "Notifications are working.", {"items": [], "test": True})
+    return await _send(cfg, "Updrift test", "Notifications are working.", {"items": [], "test": True})
 
 
 async def _send(cfg: Notify, title: str, body: str, payload: dict) -> list[str]:

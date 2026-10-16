@@ -1,7 +1,7 @@
 #!/bin/bash
-# Update Manager read-only gateway - installed on the Proxmox host as /usr/local/bin/update-manager-ro.
+# Updrift read-only gateway - installed on the Proxmox host as /usr/local/bin/update-manager-ro.
 #
-# Update Manager's SSH key is locked to this script in /root/.ssh/authorized_keys:
+# Updrift's SSH key is locked to this script in /root/.ssh/authorized_keys:
 #   command="/usr/local/bin/update-manager-ro",restrict ssh-ed25519 AAAA... update-manager
 # so whatever the app sends, only the read-only commands below can run. Anything else is refused.
 # The only thing a check may write is the package index cache (apt-get update / apk update),

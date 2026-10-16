@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.11.0 (2026-10-16)
+- New name and icon: Update Manager is now **Updrift**, with a radar logo (in the header, the sign-in page and
+  the browser tab). Nothing to reconfigure: the service, folders and Proxmox gateway scripts keep their names.
+
 ## 1.10.0 (2026-10-15)
 - Docker Compose stacks: containers of the same Compose project are grouped under a stack header
   ("immich · 4 containers · 2 to update").

@@ -1,4 +1,4 @@
-// Banner and self-update flow for new versions of Update Manager itself.
+// Banner and self-update flow for new versions of Updrift itself.
 const AppUpdate = (() => {
   let info = null;
   let updating = null;  // { from, started } while a self-update is in progress
@@ -40,7 +40,7 @@ const AppUpdate = (() => {
     const el = $("appBanner");
     if (updating) {
       el.innerHTML = `<div class="app-banner"><span class="spin"></span>
-        <div class="text"><b>Updating Update Manager…</b> This takes about a minute; the page reloads by itself.</div></div>`;
+        <div class="text"><b>Updating Updrift…</b> This takes about a minute; the page reloads by itself.</div></div>`;
       return;
     }
     if (!checking) {
@@ -49,7 +49,7 @@ const AppUpdate = (() => {
     }
     if (!a.update_available) { el.innerHTML = ""; return; }
     el.innerHTML = `<div class="app-banner">
-      <div class="text"><b>Update Manager v${esc(a.latest)} is available</b> <span class="hint">· you have v${esc(a.version)}</span></div>
+      <div class="text"><b>Updrift v${esc(a.latest)} is available</b> <span class="hint">· you have v${esc(a.version)}</span></div>
       <button data-app="notes">What's new</button>
       ${a.can_self_update ? `<button class="primary" data-app="update">Update now</button>`
                           : `<button data-app="howto">How to update</button>`}
@@ -57,15 +57,15 @@ const AppUpdate = (() => {
   }
 
   function showNotes() {
-    HowTo.show(`<h3 id="modalTitle">What's new in Update Manager</h3>
+    HowTo.show(`<h3 id="modalTitle">What's new in Updrift</h3>
       <p class="lead">You have v${esc(info.version)}, latest is v${esc(info.latest)}.</p>${notesHtml(info)}
       ${info.can_self_update ? `<p style="margin-top:16px"><button class="primary" data-app="update">Update now</button></p>` : ""}`);
   }
 
   function showHowto() {
     const cmd = UPDATE_CMD[info.install];
-    const where = info.install === "lxc" ? "In the Update Manager LXC's console" : "On the machine running Update Manager";
-    HowTo.show(`<h3 id="modalTitle">Update Update Manager to v${esc(info.latest)}</h3>
+    const where = info.install === "lxc" ? "In the Updrift LXC's console" : "On the machine running Updrift";
+    HowTo.show(`<h3 id="modalTitle">Update Updrift to v${esc(info.latest)}</h3>
       ${cmd ? `<p>${where}:</p><div class="cmd"><pre>${esc(cmd)}</pre><button data-copy>Copy</button></div>`
             : `<p>Download the latest version from <a href="https://github.com/${esc(info.repo)}" target="_blank" rel="noopener">GitHub</a> and reinstall.</p>`}
       ${info.install === "lxc" && !info.can_self_update ? `<p class="hint">"Update now" is turned off in Settings → General.</p>` : ""}
@@ -74,7 +74,7 @@ const AppUpdate = (() => {
 
   async function start() {
     const ok = await UI.confirm({
-      title: `Update Update Manager to v${info.latest}?`, ok: "Update now",
+      title: `Update Updrift to v${info.latest}?`, ok: "Update now",
       message: `You have v${info.version}. The app restarts during the update; this takes about a minute `
         + `and the page reloads by itself.`,
     });
@@ -113,7 +113,7 @@ const AppUpdate = (() => {
     updating = null;
     render(info);
     HowTo.show(`<h3 id="modalTitle">The update did not finish</h3>
-      <p>Update Manager is still on v${esc(info.version)}. You can run the update by hand in the LXC console:</p>
+      <p>Updrift is still on v${esc(info.version)}. You can run the update by hand in the LXC console:</p>
       <div class="cmd"><pre>update-manager-update</pre><button data-copy>Copy</button></div>
       ${log ? `<h4>Update log</h4><div class="cmd"><pre>${esc(log)}</pre></div>` : ""}`);
   }

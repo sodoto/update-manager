@@ -46,7 +46,7 @@ const Settings = (() => {
     view.innerHTML = `
       <section class="panel">
         <h2>General</h2>
-        <p class="help">How often Update Manager looks for updates.</p>
+        <p class="help">How often Updrift looks for updates.</p>
         <div class="grid">
           ${input("Check every (minutes)", "check_interval_minutes", { type: "number", kind: "int", hint: "Minimum 5. 360 = every 6 hours." })}
           ${input("Parallel checks", "concurrency", { type: "number", kind: "int", hint: "How many containers are checked at the same time." })}
@@ -59,11 +59,11 @@ const Settings = (() => {
       </section>
 
       <section class="panel">
-        <h2>Update Manager updates</h2>
+        <h2>Updrift updates</h2>
         <p class="help">New versions of this app are published on GitHub.</p>
         <div class="checks">
           ${checkbox("Check GitHub for new versions", "check_app_updates", "Every 6 hours. Shows a banner on the dashboard when one is available.")}
-          ${checkbox("Allow updating Update Manager from the dashboard", "allow_self_update",
+          ${checkbox("Allow updating Updrift from the dashboard", "allow_self_update",
             "Adds an <b>Update now</b> button (LXC installs only). It only updates this app, never your containers or Proxmox.")}
         </div>
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px">
@@ -74,10 +74,10 @@ const Settings = (() => {
 
       <section class="panel">
         <h2>Run updates from the app</h2>
-        <p class="help">Off: Update Manager is strictly <b>read-only</b>. On: an <b>Update</b> button installs package updates in LXCs
+        <p class="help">Off: Updrift is strictly <b>read-only</b>. On: an <b>Update</b> button installs package updates in LXCs
           and updates Docker Compose containers. It uses a <b>second, separate key</b> that can only do that; checks keep using the read-only key.</p>
         ${s.ui_username && s.ui_password ? "" : `<div class="warn">Set a dashboard login first (Dashboard login, below). It is required to turn this on.</div>`}
-        <div class="checks">${checkbox("Allow Update Manager to install updates", "allow_updates")}</div>
+        <div class="checks">${checkbox("Allow Updrift to install updates", "allow_updates")}</div>
         ${s.allow_updates ? `
         <details class="setup" open>
           <summary>Update access: run once on each Proxmox node</summary>

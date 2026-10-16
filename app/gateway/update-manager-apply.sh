@@ -1,7 +1,7 @@
 #!/bin/bash
-# Update Manager update gateway - installed on the Proxmox host as /usr/local/bin/update-manager-apply.
+# Updrift update gateway - installed on the Proxmox host as /usr/local/bin/update-manager-apply.
 #
-# OPTIONAL. Only installed if you allow Update Manager to run updates. It uses its own SSH key, locked to
+# OPTIONAL. Only installed if you allow Updrift to run updates. It uses its own SSH key, locked to
 # this script in /root/.ssh/authorized_keys:
 #   command="/usr/local/bin/update-manager-apply",restrict ssh-ed25519 AAAA... update-manager-apply
 # The read-only checks keep using update-manager-ro with the other key.

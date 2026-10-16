@@ -38,8 +38,8 @@ const Dashboard = (() => {
     pill.textContent = state.allow_updates ? "Updates enabled" : "Read-only";
     pill.classList.toggle("rw", !!state.allow_updates);
     pill.title = state.allow_updates
-      ? "Update Manager can install updates in your LXCs and Docker Compose containers when you click Update. Turn this off in Settings."
-      : "Update Manager only reads and checks. It never changes your Proxmox host, containers or Docker.";
+      ? "Updrift can install updates in your LXCs and Docker Compose containers when you click Update. Turn this off in Settings."
+      : "Updrift only reads and checks. It never changes your Proxmox host, containers or Docker.";
     const btn = $("checkBtn");
     btn.disabled = state.running;
     btn.innerHTML = state.running ? '<span class="spin"></span> Checking…' : "Check now";

@@ -20,7 +20,7 @@ form.addEventListener("submit", async (e) => {
     const data = await r.json().catch(() => ({}));
     error.textContent = data.detail || `Sign-in failed (HTTP ${r.status})`;
   } catch {
-    error.textContent = "Cannot reach Update Manager.";
+    error.textContent = "Cannot reach Updrift.";
   }
   error.hidden = false;
   button.disabled = false;

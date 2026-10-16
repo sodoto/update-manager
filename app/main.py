@@ -1,4 +1,4 @@
-"""Update Manager web app: dashboard, settings, API and periodic scheduler. Read-only by design."""
+"""Updrift web app: dashboard, settings, API and periodic scheduler. Read-only by design."""
 import asyncio
 import logging
 import re
@@ -99,7 +99,7 @@ async def lifespan(_: FastAPI):
         task.cancel()
 
 
-app = FastAPI(title="Update Manager", lifespan=lifespan)
+app = FastAPI(title="Updrift", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
 

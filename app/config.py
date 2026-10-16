@@ -61,8 +61,8 @@ class Settings(_Model):
     check_on_start: bool = True
     refresh_package_lists: bool = True  # run apt-get update / apk update before checking
     concurrency: int = Field(default=4, ge=1, le=32)
-    check_app_updates: bool = True  # look on GitHub for new versions of Update Manager
-    allow_self_update: bool = True  # allow updating Update Manager from the dashboard (LXC install)
+    check_app_updates: bool = True  # look on GitHub for new versions of Updrift
+    allow_self_update: bool = True  # allow updating Updrift from the dashboard (LXC install)
     allow_updates: bool = False  # allow installing updates on LXCs (needs the update key on each node)
     ui_username: str | None = None
     ui_password: str | None = None  # stored hashed (scrypt$...), never in plain text

@@ -24,13 +24,13 @@ const Jobs = (() => {
 
   function commands(i, action) {
     if (action === "reboot") return [
-      { label: "Update Manager asks Proxmox:", cmd: `reboot-lxc ${i.vmid}` },
+      { label: "Updrift asks Proxmox:", cmd: `reboot-lxc ${i.vmid}` },
       { label: "Proxmox runs:", cmd: `pct reboot ${i.vmid}` },
     ];
     if (action === "compose-update-stack") {
       const p = ` -p ${i.compose_project}`;
       return [
-        { label: "Update Manager asks Proxmox:", cmd: `compose-update-stack ${i.vmid} ${i.container_id.slice(0, 12)}` },
+        { label: "Updrift asks Proxmox:", cmd: `compose-update-stack ${i.vmid} ${i.container_id.slice(0, 12)}` },
         { label: `Proxmox runs inside ${i.lxc_name || `CT ${i.vmid}`}:`,
           cmd: `cd ${i.compose_dir}\ndocker compose${p} pull\ndocker compose${p} up -d` },
       ];
@@ -39,13 +39,13 @@ const Jobs = (() => {
       const p = i.compose_project ? ` -p ${i.compose_project}` : "";
       const svc = i.compose_service || "";
       return [
-        { label: "Update Manager asks Proxmox:", cmd: `compose-update ${i.vmid} ${i.container_id.slice(0, 12)}` },
+        { label: "Updrift asks Proxmox:", cmd: `compose-update ${i.vmid} ${i.container_id.slice(0, 12)}` },
         { label: `Proxmox runs inside ${i.lxc_name || `CT ${i.vmid}`}:`,
           cmd: `cd ${i.compose_dir}\ndocker compose${p} pull ${svc}\ndocker compose${p} up -d ${svc}` },
       ];
     }
     return [
-      { label: "Update Manager asks Proxmox:", cmd: `upgrade-lxc ${i.vmid}` },
+      { label: "Updrift asks Proxmox:", cmd: `upgrade-lxc ${i.vmid}` },
       { label: `Proxmox runs inside CT ${i.vmid} (${i.name}):`, cmd: (UPGRADE[i.manager] || []).join("\n") },
     ];
   }

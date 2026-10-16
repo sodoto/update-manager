@@ -63,15 +63,15 @@ echo '{done}'
 
 
 def setup_script() -> str:
-    return _snippet(public_key(), GATEWAY_PATH, GATEWAY_SCRIPT, "Update Manager read-only access installed.")
+    return _snippet(public_key(), GATEWAY_PATH, GATEWAY_SCRIPT, "Updrift read-only access installed.")
 
 
 def update_setup_script() -> str:
     return _snippet(_public(ensure_update_key()), UPDATE_GATEWAY_PATH, UPDATE_GATEWAY_SCRIPT,
-                    "Update Manager update access installed.")
+                    "Updrift update access installed.")
 
 
 def update_revoke_script() -> str:
     key_b64 = _public(ensure_update_key()).split()[1]
     return (f"sed -i --follow-symlinks '\\#{key_b64}#d' /root/.ssh/authorized_keys && rm -f {UPDATE_GATEWAY_PATH}\n"
-            "echo 'Update access removed: Update Manager is read-only again.'\n")
+            "echo 'Update access removed: Updrift is read-only again.'\n")
