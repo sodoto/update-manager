@@ -57,7 +57,7 @@ const Jobs = (() => {
     };
     if (action === "compose-update-stack") {
       const members = Dashboard.stack(i);
-      const state = (m) => m.status === "update_available" ? "new image"
+      const state = (m) => m.status === "update_available" ? dockerUpdateLabel(m)
         : m.status === "skipped" ? `skipped${m.note ? ` (${m.note})` : ""}` : m.status === "error" ? "error" : "up to date";
       return {
         title: `Update the ${i.compose_project} stack?`, ok: "Update stack",
@@ -68,7 +68,7 @@ const Jobs = (() => {
     }
     if (action === "compose-update") return {
       title: `Update ${i.name}?`, ok: "Update",
-      message: `Pulls the new image for ${i.detail} and recreates the container `
+      message: `${i.new_version ? `${dockerUpdateLabel(i)}.\n\n` : ""}Pulls the new image for ${i.detail} and recreates the container `
         + `(docker compose pull + up -d in ${i.compose_dir}).\n\nData in volumes is kept.`,
     };
     return {

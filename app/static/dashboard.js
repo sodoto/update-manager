@@ -137,7 +137,9 @@ const Dashboard = (() => {
     if (i.community_script) badges.push(`<span class="badge" title="Created with the Proxmox VE community script ct/${esc(i.community_script)}.sh">Helper script</span>`);
     if (apps.length) badges.push(`<span class="badge update_available" title="${esc(apps.map(a => `${a.name} ${a.current} → ${a.latest}`).join(", "))}">App update</span>`);
     if (i.status === "update_available" && (i.kind === "docker" || i.update_count)) {
-      badges.push(`<span class="badge update_available">${i.kind === "docker" ? "New image" : `${i.update_count} package${i.update_count === 1 ? "" : "s"}`}</span>`);
+      const rebuilt = i.kind === "docker" && dockerUpdateLabel(i) === "Rebuilt image";
+      badges.push(`<span class="badge update_available"${rebuilt ? ' title="Same version number, new build (often security fixes in the base image)"' : ""}>${
+        i.kind === "docker" ? esc(dockerUpdateLabel(i)) : `${i.update_count} package${i.update_count === 1 ? "" : "s"}`}</span>`);
       if (i.security_count) badges.push(`<span class="badge sec">${i.security_count} security</span>`);
     } else if (i.status !== "update_available") {
       badges.push(`<span class="badge ${i.status}">${STATUS[i.status]}</span>`);
@@ -154,6 +156,8 @@ const Dashboard = (() => {
     if (job) buttons.push(`<button class="small" data-job-view="${esc(job.id)}"><span class="spin"></span> Updating…</button>`);
     else if (state.allow_updates && i.status === "update_available" && Jobs.canApply(i))
       buttons.push(`<button class="primary" data-apply="${esc(i.id)}">Update</button>`);
+    if (i.kind === "docker" && i.status === "update_available" && i.release_url)
+      buttons.push(`<a class="btn" href="${esc(i.release_url)}" target="_blank" rel="noopener">Release notes ↗</a>`);
     if (i.status === "update_available")
       buttons.push(`<button class="icon-btn" data-howto="${esc(i.id)}" title="How to update" aria-label="How to update ${esc(i.name)}">i</button>`);
     if (i.packages.length || i.kind === "docker" || i.note || i.community_script)
@@ -175,6 +179,12 @@ const Dashboard = (() => {
     if (i.kind === "docker") {
       return `<table>
         <tr><th>Image</th><td><code>${esc(i.detail)}</code></td></tr>
+        <tr><th>Running version</th><td>${esc(i.current_version || "not published by this image")}</td></tr>
+        ${i.status === "update_available" ? `<tr><th>New version</th><td>${esc(i.new_version || "not published by this image")}${
+          dockerUpdateLabel(i) === "Rebuilt image" ? " (same version, new build)" : ""}</td></tr>` : ""}
+        ${i.release_url ? `<tr><th>Release notes</th><td><a href="${esc(i.release_url)}" target="_blank" rel="noopener">${esc(i.release_url.replace("https://", ""))}</a></td></tr>` : ""}
+        ${i.source_url && i.source_url !== i.release_url ? `<tr><th>Source code</th><td><a href="${esc(i.source_url)}" target="_blank" rel="noopener">${esc(i.source_url.replace("https://", ""))}</a></td></tr>` : ""}
+        ${i.image_page ? `<tr><th>Image page</th><td><a href="${esc(i.image_page)}" target="_blank" rel="noopener">${esc(i.image_page.replace("https://", ""))}</a></td></tr>` : ""}
         <tr><th>Running digest</th><td><code>${esc(i.local_digest || "—")}</code></td></tr>
         <tr><th>Registry digest</th><td><code>${esc(i.remote_digest || "—")}</code></td></tr>
         ${i.note ? `<tr><th>Note</th><td>${esc(i.note)}</td></tr>` : ""}

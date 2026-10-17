@@ -84,8 +84,13 @@ const HowTo = (() => {
     const lxcName = i.lxc_name || `CT ${i.vmid}`;
     const place = inLxc ? where(`Inside ${lxcName}`) : where(`On ${i.source}`);
     let html = `<h3 id="modalTitle">Update container ${esc(i.name)}</h3>
-      <p class="lead">A newer image was published for <code>${esc(i.detail)}</code>. Updating means pulling the new image
-        and recreating the container. Data in volumes and bind mounts is kept.</p>
+      <p class="lead">${i.new_version && dockerUpdateLabel(i) !== "Rebuilt image"
+          ? `Version ${esc(i.new_version)} is available${i.current_version ? ` (you run ${esc(i.current_version)})` : ""}.`
+          : dockerUpdateLabel(i) === "Rebuilt image"
+            ? `A rebuilt image of the same version (${esc(i.new_version)}) was published, usually with security fixes.`
+            : `A newer image was published for <code>${esc(i.detail)}</code>.`}
+        Updating means pulling the new image and recreating the container. Data in volumes and bind mounts is kept.
+        ${i.release_url ? `<a href="${esc(i.release_url)}" target="_blank" rel="noopener">Read the release notes ↗</a>` : ""}</p>
 
       <h4>Option A: Dockhand (easiest)</h4>
       <p>${i.link ? `<a class="btn" href="${esc(i.link)}" target="_blank" rel="noopener">Open Dockhand ↗</a>` : "Open the Dockhand that manages this container."}</p>

@@ -14,6 +14,7 @@ from .notify import send_notifications
 from .packages import PackageReport, parse_check_output
 from .proxmox import GATEWAY_VERSION, ProxmoxSession
 from .registry import RegistryClient, local_digest_for, parse_image_ref
+from .releases import SOURCE_LABEL, VERSION_LABEL, ReleaseNotes, clean_version, github_repo, image_page
 
 log = logging.getLogger("update-manager")
 STATE_FILE = DATA_DIR / "state.json"
@@ -47,7 +48,8 @@ def _signature(item: dict) -> str:
 
 
 async def _docker_item(c: ContainerInfo, registry: RegistryClient, group: str, source: str,
-                       id_prefix: str, link: str | None, vmid: int | None = None) -> dict:
+                       id_prefix: str, link: str | None, vmid: int | None = None,
+                       notes: ReleaseNotes | None = None, token: str | None = None) -> dict:
     item = _item("docker", f"{id_prefix}:{c.name}", group, source, c.name, c.image, state=c.state, link=link,
                  vmid=vmid,
                  # Used by the "how to update" instructions.
@@ -71,8 +73,18 @@ async def _docker_item(c: ContainerInfo, registry: RegistryClient, group: str, s
     except Exception as exc:
         return {**item, "status": "error", "note": _err(exc)}
     item["remote_digest"] = remote
+    item["image_page"] = image_page(ref)
+    item["current_version"] = clean_version(c.image_labels.get(VERSION_LABEL))
+    code_source = c.image_labels.get(SOURCE_LABEL)
     if remote != local:
         item.update(status="update_available", update_count=1, note="newer image published for this tag")
+        new_labels = await registry.image_labels(ref, remote, c.os, c.arch)
+        item["new_version"] = clean_version(new_labels.get(VERSION_LABEL))
+        code_source = new_labels.get(SOURCE_LABEL) or code_source
+        if notes:
+            item["release_url"] = await notes.url(code_source, item["new_version"], token)
+    if github_repo(code_source):
+        item["source_url"] = f"https://github.com/{github_repo(code_source)}"
     return item
 
 
@@ -85,6 +97,7 @@ class Checker:
         self.settings = settings
         self._lock = asyncio.Lock()
         self.community = CommunityScripts()
+        self.releases = ReleaseNotes()
         self._busy: set[str] = set()  # items being re-checked on their own
         self.state = {
             "running": False, "last_check_started": None, "last_check_finished": None,
@@ -165,7 +178,8 @@ class Checker:
         if port and hostname:
             link = f"http://{hostname}:{port}"
         return list(await asyncio.gather(*(
-            _docker_item(c, registry, group, host.name, group, link)
+            _docker_item(c, registry, group, host.name, group, link,
+                         notes=self.releases, token=self.settings.github_token)
             for c in containers if only is None or c.name == only
         )))
 
@@ -235,7 +249,8 @@ class Checker:
                     link = f"http://{ip}:{port}"
                     item["link"] = link  # this LXC runs its own Dockhand
                 docker_items = await asyncio.gather(*(
-                    _docker_item(c, registry, group, source, id_prefix, link, vmid) for c in containers
+                    _docker_item(c, registry, group, source, id_prefix, link, vmid,
+                                 notes=self.releases, token=self.settings.github_token) for c in containers
                 ))
                 for d in docker_items:
                     d.update(ip=ip, lxc_name=name)
@@ -314,7 +329,8 @@ class Checker:
             if not match:
                 return [], {item["id"]}  # the container was removed
             fresh = await _docker_item(match, registry, group, item["source"], docker_prefix.rstrip(":"),
-                                       item.get("link"), vmid)
+                                       item.get("link"), vmid, notes=self.releases,
+                                       token=self.settings.github_token)
             fresh.update(ip=item.get("ip"), lxc_name=item.get("lxc_name"))
             return [fresh], {item["id"]}
 

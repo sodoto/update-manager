@@ -85,6 +85,8 @@ class RegistryClient:
             (DOCKER_HUB if a.registry in DOCKER_HUB_ALIASES else a.registry): a for a in auths
         }
         self._cache: dict[tuple, asyncio.Task] = {}
+        self._labels: dict[str, asyncio.Task] = {}
+        self._tokens: dict[tuple, str] = {}
 
     async def close(self):
         await self._http.aclose()
@@ -127,6 +129,46 @@ class RegistryClient:
         if resp.status_code == 429:
             raise RegistryError("registry rate limit hit")
         raise RegistryError(f"registry returned HTTP {resp.status_code}")
+
+    async def image_labels(self, ref: ImageRef, digest: str, os_: str = "linux", arch: str = "amd64") -> dict:
+        """Labels of the image published at `digest` (for the given platform). Empty if unavailable."""
+        key = f"{ref.registry}/{ref.repository}@{digest}/{os_}/{arch}"
+        if key not in self._labels:
+            self._labels[key] = asyncio.create_task(self._fetch_labels(ref, digest, os_, arch))
+        try:
+            return await self._labels[key]
+        except Exception:
+            return {}
+
+    async def _fetch_labels(self, ref: ImageRef, digest: str, os_: str, arch: str) -> dict:
+        manifest = (await self._get(ref, f"manifests/{digest}")).json()
+        if "manifests" in manifest:  # multi-platform index: pick ours
+            entries = [m for m in manifest["manifests"] if (m.get("platform") or {}).get("os") not in (None, "unknown")]
+            match = next((m for m in entries if m["platform"].get("os") == os_
+                          and m["platform"].get("architecture") == arch), entries[0] if entries else None)
+            if not match:
+                return {}
+            manifest = (await self._get(ref, f"manifests/{match['digest']}")).json()
+        config_digest = (manifest.get("config") or {}).get("digest")
+        if not config_digest:
+            return {}
+        config = (await self._get(ref, f"blobs/{config_digest}")).json()
+        return (config.get("config") or {}).get("Labels") or {}
+
+    async def _get(self, ref: ImageRef, path: str) -> httpx.Response:
+        """GET /v2/<repo>/<path>, authenticating once per repository."""
+        url = f"https://{_api_host(ref.registry)}/v2/{ref.repository}/{path}"
+        headers = {"Accept": MANIFEST_ACCEPT}
+        key = (ref.registry, ref.repository)
+        if key in self._tokens:
+            headers["Authorization"] = self._tokens[key]
+        resp = await self._http.get(url, headers=headers)
+        if resp.status_code == 401:
+            self._tokens[key] = await self._authorize(ref, resp.headers.get("www-authenticate", ""))
+            headers["Authorization"] = self._tokens[key]
+            resp = await self._http.get(url, headers=headers)
+        resp.raise_for_status()
+        return resp
 
     async def _authorize(self, ref: ImageRef, challenge: str) -> str:
         scheme, params = _parse_challenge(challenge)

@@ -22,6 +22,9 @@ class ContainerInfo:
     repo_digests: list[str] = field(default_factory=list)
     labels: dict[str, str] = field(default_factory=dict)
     ports: list[tuple[int, int, str]] = field(default_factory=list)  # (container port, host port, host IP)
+    image_labels: dict[str, str] = field(default_factory=dict)  # labels of the image (version, source...)
+    os: str = "linux"
+    arch: str = "amd64"
     network_mode: str = ""
 
     @property
@@ -32,13 +35,17 @@ class ContainerInfo:
 def _from_inspect(container: dict, images: dict[str, dict]) -> ContainerInfo:
     image_id = container.get("Image", "")
     config = container.get("Config") or {}
+    image = images.get(image_id) or {}
     return ContainerInfo(
         id=container.get("Id", ""),
         name=container.get("Name", "").lstrip("/"),
         image=config.get("Image", ""),
         image_id=image_id,
         state=(container.get("State") or {}).get("Status", "unknown"),
-        repo_digests=(images.get(image_id) or {}).get("RepoDigests") or [],
+        repo_digests=image.get("RepoDigests") or [],
+        image_labels=(image.get("Config") or {}).get("Labels") or {},
+        os=image.get("Os") or "linux",
+        arch=image.get("Architecture") or "amd64",
         labels=config.get("Labels") or {},
         ports=_published_ports(container),
         network_mode=(container.get("HostConfig") or {}).get("NetworkMode", ""),

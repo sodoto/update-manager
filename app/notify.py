@@ -10,6 +10,8 @@ log = logging.getLogger("update-manager")
 
 def _describe(item: dict) -> str:
     if item["kind"] == "docker":
+        if item.get("new_version"):
+            return f"{item['name']} ({item['source']}) - {item.get('current_version') or '?'} -> {item['new_version']}"
         return f"{item['name']} ({item['source']}) - new image for {item['detail']}"
     parts = [f"{item['update_count']} package(s)"] if item["update_count"] else []
     parts += [f"{a['name']} {a['current']} -> {a['latest']}" for a in item.get("app_updates", []) if a["update"]]

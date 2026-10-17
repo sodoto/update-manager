@@ -19,6 +19,13 @@ async function api(path, method = "GET", body) {
   return data;
 }
 
+// "v1.2 → v1.3", "Rebuilt image" or "New image" for a Docker container with an update.
+function dockerUpdateLabel(i) {
+  if (i.new_version && i.current_version === i.new_version) return "Rebuilt image";
+  if (i.new_version) return `${i.current_version || "?"} → ${i.new_version}`;
+  return "New image";
+}
+
 function ago(iso) {
   if (!iso) return "never";
   const s = Math.round((Date.now() - new Date(iso)) / 1000);

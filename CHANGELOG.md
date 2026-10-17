@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.12.0 (2026-10-16)
+- Docker updates show versions: "v3.3.2 → v3.3.3" instead of "New image", read from the running image and
+  the new one (the standard org.opencontainers.image.version label). "Rebuilt image" when the version is
+  the same but the image changed (usually base-image security fixes).
+- **Release notes ↗** link on Docker updates: the exact GitHub release when it exists, otherwise the
+  project's releases page. Details also link to the source code and, for Docker Hub, the image's tags page.
+- Versions also appear in the ⓘ window, the update confirmations and notifications.
+
 ## 1.11.1 (2026-10-16)
 - The GitHub repository is now github.com/sodoto/updrift (the old address redirects). Updrift and its
   installer now use the new address, and updating an existing install switches it over automatically.
